@@ -69,84 +69,94 @@ function buildWhereClause(filters: DashboardFilters) {
 }
 
 export async function getDashboardStats(filters: DashboardFilters) {
-  const { whereClause, params } = buildWhereClause(filters);
+  try {
+    const { whereClause, params } = buildWhereClause(filters);
 
-  const statsQuery = `
-    SELECT 
-      SUM(COALESCE(pokok_pkb, 0) + COALESCE(opsen_pokok_pkb, 0)) as total_potensi,
-      SUM(
-        COALESCE(tunggakan_pokok_pkb, 0) + 
-        COALESCE(tunggakan_pokok_bbnkb, 0) + 
-        COALESCE(opsen_tunggakan_pokok_pkb, 0) + 
-        COALESCE(opsen_tunggakan_pokok_bbnkb, 0) + 
-        COALESCE(denda_swdkllj, 0) + 
-        COALESCE(tunggakan_denda_swdkllj, 0)
-      ) as total_tunggakan,
-      AVG(CASE WHEN (
-        COALESCE(tunggakan_pokok_pkb, 0) + 
-        COALESCE(tunggakan_pokok_bbnkb, 0) + 
-        COALESCE(opsen_tunggakan_pokok_pkb, 0) + 
-        COALESCE(opsen_tunggakan_pokok_bbnkb, 0) + 
-        COALESCE(denda_swdkllj, 0) + 
-        COALESCE(tunggakan_denda_swdkllj, 0)
-      ) > 0 THEN 12 ELSE 0 END) as avg_delay
-    FROM v_kendaraan_transaksi_clean
-    ${whereClause}
-  `;
+    const statsQuery = `
+      SELECT 
+        SUM(COALESCE(pokok_pkb, 0) + COALESCE(opsen_pokok_pkb, 0)) as total_potensi,
+        SUM(
+          COALESCE(tunggakan_pokok_pkb, 0) + 
+          COALESCE(tunggakan_pokok_bbnkb, 0) + 
+          COALESCE(opsen_tunggakan_pokok_pkb, 0) + 
+          COALESCE(opsen_tunggakan_pokok_bbnkb, 0) + 
+          COALESCE(denda_swdkllj, 0) + 
+          COALESCE(tunggakan_denda_swdkllj, 0)
+        ) as total_tunggakan,
+        AVG(CASE WHEN (
+          COALESCE(tunggakan_pokok_pkb, 0) + 
+          COALESCE(tunggakan_pokok_bbnkb, 0) + 
+          COALESCE(opsen_tunggakan_pokok_pkb, 0) + 
+          COALESCE(opsen_tunggakan_pokok_bbnkb, 0) + 
+          COALESCE(denda_swdkllj, 0) + 
+          COALESCE(tunggakan_denda_swdkllj, 0)
+        ) > 0 THEN 12 ELSE 0 END) as avg_delay
+      FROM v_kendaraan_transaksi_clean
+      ${whereClause}
+    `;
 
-  const res = await query(statsQuery, params);
-  const row = res.rows[0];
+    const res = await query(statsQuery, params);
+    const row = res.rows[0];
 
-  const totalPotensiVal = Number(row.total_potensi || 0);
-  const totalTunggakanVal = Number(row.total_tunggakan || 0);
-  
-  const totalPotensi = totalPotensiVal / 1000000;
-  const totalTunggakan = totalTunggakanVal / 1000000;
-  
-  const kepatuhan = totalPotensiVal > 0 
-    ? (((totalPotensiVal - totalTunggakanVal) / totalPotensiVal) * 100).toFixed(1) 
-    : "0";
+    const totalPotensiVal = Number(row.total_potensi || 0);
+    const totalTunggakanVal = Number(row.total_tunggakan || 0);
+    
+    const totalPotensi = totalPotensiVal / 1000000;
+    const totalTunggakan = totalTunggakanVal / 1000000;
+    
+    const kepatuhan = totalPotensiVal > 0 
+      ? (((totalPotensiVal - totalTunggakanVal) / totalPotensiVal) * 100).toFixed(1) 
+      : "0";
 
-  return {
-    totalPotensi,
-    totalTunggakan,
-    avgDelay: Math.round(Number(row.avg_delay || 0)),
-    kepatuhan
-  };
+    return {
+      totalPotensi,
+      totalTunggakan,
+      avgDelay: Math.round(Number(row.avg_delay || 0)),
+      kepatuhan
+    };
+  } catch (error) {
+    console.error("Error in getDashboardStats:", error);
+    throw error;
+  }
 }
 
 export async function getCitySummary(filters: DashboardFilters): Promise<CityData[]> {
-  const { whereClause, params } = buildWhereClause(filters);
+  try {
+    const { whereClause, params } = buildWhereClause(filters);
 
-  const cityQuery = `
-    SELECT 
-      kabupaten as name,
-      SUM(COALESCE(pokok_pkb, 0)) as pkb,
-      SUM(
-        COALESCE(tunggakan_pokok_pkb, 0) + 
-        COALESCE(tunggakan_pokok_bbnkb, 0) + 
-        COALESCE(opsen_tunggakan_pokok_pkb, 0) + 
-        COALESCE(opsen_tunggakan_pokok_bbnkb, 0) + 
-        COALESCE(denda_swdkllj, 0) + 
-        COALESCE(tunggakan_denda_swdkllj, 0)
-      ) as tunggakan,
-      SUM(COALESCE(pokok_pkb, 0) + COALESCE(opsen_pokok_pkb, 0)) as potensi,
-      AVG(12) as keterlambatan
-    FROM v_kendaraan_transaksi_clean
-    ${whereClause}
-    GROUP BY kabupaten
-    ORDER BY potensi DESC
-  `;
+    const cityQuery = `
+      SELECT 
+        kabupaten as name,
+        SUM(COALESCE(pokok_pkb, 0)) as pkb,
+        SUM(
+          COALESCE(tunggakan_pokok_pkb, 0) + 
+          COALESCE(tunggakan_pokok_bbnkb, 0) + 
+          COALESCE(opsen_tunggakan_pokok_pkb, 0) + 
+          COALESCE(opsen_tunggakan_pokok_bbnkb, 0) + 
+          COALESCE(denda_swdkllj, 0) + 
+          COALESCE(tunggakan_denda_swdkllj, 0)
+        ) as tunggakan,
+        SUM(COALESCE(pokok_pkb, 0) + COALESCE(opsen_pokok_pkb, 0)) as potensi,
+        AVG(12) as keterlambatan
+      FROM v_kendaraan_transaksi_clean
+      ${whereClause}
+      GROUP BY kabupaten
+      ORDER BY potensi DESC
+    `;
 
-  const res = await query(cityQuery, params);
-  return res.rows.map(row => ({
-    name: row.name || "N/A",
-    pkb: Number(row.pkb || 0) / 1000000,
-    tunggakan: Number(row.tunggakan || 0) / 1000000,
-    potensi: Number(row.potensi || 0) / 1000000,
-    keterlambatan: Math.round(Number(row.keterlambatan || 0)),
-    golongan: "All"
-  }));
+    const res = await query(cityQuery, params);
+    return res.rows.map(row => ({
+      name: row.name || "N/A",
+      pkb: Number(row.pkb || 0) / 1000000,
+      tunggakan: Number(row.tunggakan || 0) / 1000000,
+      potensi: Number(row.potensi || 0) / 1000000,
+      keterlambatan: Math.round(Number(row.keterlambatan || 0)),
+      golongan: "All"
+    }));
+  } catch (error) {
+    console.error("Error in getCitySummary:", error);
+    throw error;
+  }
 }
 
 export async function getTransactions(filters: DashboardFilters, page: number = 1): Promise<DetailedData[]> {

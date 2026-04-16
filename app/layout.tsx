@@ -8,6 +8,8 @@ const poppins = Poppins({
   weight: ["300", "400", "500", "600", "700", "800"],
 });
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "SADAR Analytics | BAPENDA KALTENG",
   description: "Sistem Analitik Data untuk Aksi Responsif Pajak Kendaraan (SADAR) - Bapenda Kalimantan Tengah",
