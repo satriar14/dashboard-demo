@@ -150,4 +150,5 @@ export interface HeatmapPoint {
   lat: number;
   lng: number;
   value: number;
+  count?: number;
 }

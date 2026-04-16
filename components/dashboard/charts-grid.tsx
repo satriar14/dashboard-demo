@@ -31,6 +31,7 @@ import {
 
 interface ChartsGridProps {
   data: CityData[];
+  kabupatenData: CityData[];
   arrearsByYearData: ArrearsByYear[];
   arrearsByLocationData: ArrearsByLocation[];
   heatmapData: HeatmapPoint[];
@@ -41,8 +42,9 @@ interface ChartsGridProps {
   complianceData: { name: string, value: number }[]; // New prop
 }
 
-export function ChartsGrid({ data, arrearsByYearData, arrearsByLocationData, heatmapData, forecastData, kecamatanForecastData, paymentHeatmapData, totalRows, complianceData }: ChartsGridProps) {
+export function ChartsGrid({ data, kabupatenData, arrearsByYearData, arrearsByLocationData, heatmapData, forecastData, kecamatanForecastData, paymentHeatmapData, totalRows, complianceData }: ChartsGridProps) {
   const top10Data = useMemo(() => data.slice(0, 10), [data]);
+  const top10KabupatenData = useMemo(() => kabupatenData ? kabupatenData.slice(0, 10) : [], [kabupatenData]);
   
   const riskData = useMemo(() => data.map(city => ({
     name: city.name,
@@ -128,16 +130,16 @@ export function ChartsGrid({ data, arrearsByYearData, arrearsByLocationData, hea
         </Card>
       </motion.div>
 
-      {/* Potensi per Kota (Stacked) */}
+    {/* Potensi per Kabupaten/Kota (Stacked) */}
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}>
         <Card className="h-full border-slate-200/60 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Potensi per Kecamatan (Stacked)</CardTitle>
+            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Potensi per Kabupaten/Kota (Stacked)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={top10Data} margin={{ top: 40, right: 20, left: 10, bottom: 60 }}>
+                <BarChart data={top10KabupatenData} margin={{ top: 40, right: 20, left: 10, bottom: 60 }}>
                   <CartesianGrid strokeDasharray="0" vertical={false} stroke="#f1f5f9" />
                   <XAxis 
                     dataKey="name" 

@@ -147,6 +147,33 @@ export async function getCitySummary(filters: DashboardFilters): Promise<CityDat
   return result.sort((a, b) => b.potensi - a.potensi);
 }
 
+export async function getKabupatenSummary(filters: DashboardFilters): Promise<CityData[]> {
+  const data = await getDashboardData();
+  const filtered = applyFilters(data, filters);
+
+  const summaryMap: Record<string, CityData> = {};
+
+  filtered.forEach(item => {
+    const groupName = item.kabupaten || 'N/A';
+    if (!summaryMap[groupName]) {
+      summaryMap[groupName] = {
+        name: groupName,
+        pkb: 0,
+        tunggakan: 0,
+        potensi: 0,
+        keterlambatan: 0,
+        golongan: "All"
+      };
+    }
+    
+    summaryMap[groupName].pkb += (item.pokok / 1000000);
+    summaryMap[groupName].tunggakan += (item.denda / 1000000);
+    summaryMap[groupName].potensi += ((item.pokok + (item.opsen || 0)) / 1000000);
+  });
+
+  return Object.values(summaryMap).sort((a, b) => b.potensi - a.potensi);
+}
+
 export async function getTransactions(filters: DashboardFilters, page: number = 1): Promise<DetailedData[]> {
   const data = await getDashboardData();
   const filtered = applyFilters(data, filters);
@@ -468,7 +495,8 @@ export async function getPaymentHeatmapData(filters: DashboardFilters): Promise<
       name: info.uptNama,
       lat: coords.lat,
       lng: coords.lng,
-      value: Math.round(info.totalPkb * 100) / 100
+      value: Math.round(info.totalPkb * 100) / 100,
+      count: info.count
     };
   }).filter(p => p.value > 0);
 }

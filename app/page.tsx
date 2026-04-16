@@ -36,6 +36,7 @@ import {
 import { 
   getDashboardStats,
   getCitySummary,
+  getKabupatenSummary,
   getTransactions,
   getTotalTransactions,
   getArrearsByProdYear,
@@ -73,14 +74,9 @@ export default function DashboardPage() {
   const [golonganOptions, setGolonganOptions] = useState<string[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
-  const [stats, setStats] = useState({ 
-    totalPotensi: 0, 
-    totalTunggakan: 0, 
-    avgDelay: 0, 
-    kepatuhan: "0",
-    complianceDist: [] as { name: string, value: number }[]
-  });
+  const [stats, setStats] = useState<any>(null);
   const [filteredCityData, setFilteredCityData] = useState<CityData[]>([]);
+  const [filteredKabupatenData, setFilteredKabupatenData] = useState<CityData[]>([]);
   const [filteredDetailedData, setFilteredDetailedData] = useState<DetailedData[]>([]);
   const [arrearsByYearData, setArrearsByYearData] = useState<ArrearsByYear[]>([]);
   const [arrearsByLocationData, setArrearsByLocationData] = useState<ArrearsByLocation[]>([]);
@@ -150,9 +146,10 @@ export default function DashboardPage() {
         jenis: selectedJenis
       };
 
-      const [statsRes, cityRes, transRes, totalRes, arrearsYearRes, arrearsLocRes, heatmapDataRes, forecastRes, kecForecastRes, paymentHeatmapRes] = await Promise.all([
+      const [statsRes, cityRes, kabupatenRes, transRes, totalRes, arrearsYearRes, arrearsLocRes, heatmapDataRes, forecastRes, kecForecastRes, paymentHeatmapRes] = await Promise.all([
         getDashboardStats(filters),
         getCitySummary(filters),
+        getKabupatenSummary(filters),
         getTransactions(filters, page),
         getTotalTransactions(filters),
         getArrearsByProdYear(filters),
@@ -165,6 +162,7 @@ export default function DashboardPage() {
 
       setStats(statsRes);
       setFilteredCityData(cityRes);
+      setFilteredKabupatenData(kabupatenRes);
       setFilteredDetailedData(transRes);
       setTotalTransactions(totalRes);
       setArrearsByYearData(arrearsYearRes);
@@ -400,7 +398,8 @@ export default function DashboardPage() {
             </div>
           ) : (
             <ChartsGrid 
-              data={filteredCityData} 
+              data={filteredCityData}
+              kabupatenData={filteredKabupatenData} 
               arrearsByYearData={arrearsByYearData}
               arrearsByLocationData={arrearsByLocationData}
               heatmapData={heatmapData}
