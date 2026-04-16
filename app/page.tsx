@@ -40,13 +40,17 @@ import {
   getTotalTransactions,
   getArrearsByProdYear,
   getArrearsByLocation,
+  getHeatmapData,
   DashboardFilters,
   getKabupatenOptions,
   getKecamatanOptions,
   getDesaOptions,
   getJenisKendaraanOptions,
   getYearOptions,
-  getGolonganOptions
+  getGolonganOptions,
+  getForecastData,
+  getKecamatanForecastSeries,
+  getPaymentHeatmapData
 } from "@/lib/api-actions";
 
 export default function DashboardPage() {
@@ -69,13 +73,23 @@ export default function DashboardPage() {
   const [golonganOptions, setGolonganOptions] = useState<string[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
-  const [stats, setStats] = useState({ totalPotensi: 0, totalTunggakan: 0, avgDelay: 0, kepatuhan: "0" });
+  const [stats, setStats] = useState({ 
+    totalPotensi: 0, 
+    totalTunggakan: 0, 
+    avgDelay: 0, 
+    kepatuhan: "0",
+    complianceDist: [] as { name: string, value: number }[]
+  });
   const [filteredCityData, setFilteredCityData] = useState<CityData[]>([]);
   const [filteredDetailedData, setFilteredDetailedData] = useState<DetailedData[]>([]);
   const [arrearsByYearData, setArrearsByYearData] = useState<ArrearsByYear[]>([]);
   const [arrearsByLocationData, setArrearsByLocationData] = useState<ArrearsByLocation[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalTransactions, setTotalTransactions] = useState(0);
+  const [heatmapData, setHeatmapData] = useState<any[]>([]);
+  const [forecastData, setForecastData] = useState<any[]>([]);
+  const [kecamatanForecastData, setKecamatanForecastData] = useState<any>(null);
+  const [paymentHeatmapData, setPaymentHeatmapData] = useState<any[]>([]);
 
   // Initial fetch for Kabupaten and Jenis choices
   useEffect(() => {
@@ -136,13 +150,17 @@ export default function DashboardPage() {
         jenis: selectedJenis
       };
 
-      const [statsRes, cityRes, transRes, totalRes, arrearsYearRes, arrearsLocRes] = await Promise.all([
+      const [statsRes, cityRes, transRes, totalRes, arrearsYearRes, arrearsLocRes, heatmapDataRes, forecastRes, kecForecastRes, paymentHeatmapRes] = await Promise.all([
         getDashboardStats(filters),
         getCitySummary(filters),
         getTransactions(filters, page),
         getTotalTransactions(filters),
         getArrearsByProdYear(filters),
-        getArrearsByLocation(filters)
+        getArrearsByLocation(filters),
+        getHeatmapData(filters),
+        getForecastData(filters),
+        getKecamatanForecastSeries(filters),
+        getPaymentHeatmapData(filters)
       ]);
 
       setStats(statsRes);
@@ -151,6 +169,10 @@ export default function DashboardPage() {
       setTotalTransactions(totalRes);
       setArrearsByYearData(arrearsYearRes);
       setArrearsByLocationData(arrearsLocRes);
+      setHeatmapData(heatmapDataRes);
+      setForecastData(forecastRes);
+      setKecamatanForecastData(kecForecastRes);
+      setPaymentHeatmapData(paymentHeatmapRes);
       setCurrentPage(page);
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
@@ -366,6 +388,7 @@ export default function DashboardPage() {
           {isLoading ? (
             <div className="space-y-6">
               <HeatmapSkeleton />
+              <HeatmapSkeleton />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <ChartCardSkeleton />
                 <ChartCardSkeleton />
@@ -380,6 +403,12 @@ export default function DashboardPage() {
               data={filteredCityData} 
               arrearsByYearData={arrearsByYearData}
               arrearsByLocationData={arrearsByLocationData}
+              heatmapData={heatmapData}
+              forecastData={forecastData}
+              kecamatanForecastData={kecamatanForecastData}
+              paymentHeatmapData={paymentHeatmapData}
+              totalRows={totalTransactions}
+              complianceData={stats.complianceDist}
             />
           )}
         </section>

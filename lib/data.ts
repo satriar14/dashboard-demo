@@ -144,3 +144,10 @@ export const COLORS = {
 
 export const CHART_PALETTE = ['#818cf8', '#a5b4fc', '#c7d2fe'];
 export const COMPLIANCE_COLORS = [COLORS.danger, COLORS.warning, COLORS.success];
+
+export interface HeatmapPoint {
+  name: string;
+  lat: number;
+  lng: number;
+  value: number;
+}

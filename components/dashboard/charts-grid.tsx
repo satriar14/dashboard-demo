@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { 
   BarChart, Bar, PieChart, Pie, Cell, ScatterChart, Scatter, 
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area,
-  LineChart, Line, LabelList
+  LineChart, Line, LabelList, Legend
 } from 'recharts';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { MoreVertical, TrendingUp } from "lucide-react";
@@ -19,9 +19,10 @@ import {
   CityData,
   ArrearsByYear,
   ArrearsByLocation,
+  HeatmapPoint,
   RAW_CITY_DATA, 
-  complianceDataConstant, 
-  forecastData, 
+  // complianceDataConstant (Remove this as it's now a prop)
+  // forecastData (Remove this as it's now a prop)
   COLORS, 
   CHART_PALETTE, 
   COMPLIANCE_COLORS,
@@ -32,9 +33,15 @@ interface ChartsGridProps {
   data: CityData[];
   arrearsByYearData: ArrearsByYear[];
   arrearsByLocationData: ArrearsByLocation[];
+  heatmapData: HeatmapPoint[];
+  forecastData: any[];
+  kecamatanForecastData: { data: any[], kecamatanList: string[] } | null;
+  paymentHeatmapData: HeatmapPoint[];
+  totalRows: number;
+  complianceData: { name: string, value: number }[]; // New prop
 }
 
-export function ChartsGrid({ data, arrearsByYearData, arrearsByLocationData }: ChartsGridProps) {
+export function ChartsGrid({ data, arrearsByYearData, arrearsByLocationData, heatmapData, forecastData, kecamatanForecastData, paymentHeatmapData, totalRows, complianceData }: ChartsGridProps) {
   const top10Data = useMemo(() => data.slice(0, 10), [data]);
   
   const riskData = useMemo(() => data.map(city => ({
@@ -53,9 +60,27 @@ export function ChartsGrid({ data, arrearsByYearData, arrearsByLocationData }: C
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Leaflet Heatmap */}
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }} className="lg:col-span-2 order-first">
-        <LeafletHeatmap data={data} />
+      {/* Heatmaps side-by-side */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.1 }}
+        className="lg:col-span-2 order-first grid grid-cols-1 lg:grid-cols-2 gap-6"
+      >
+        <LeafletHeatmap 
+          points={heatmapData}
+          title="Peta Konsentrasi Tunggakan Pajak"
+          subtitle="Fokus Wilayah Aktif"
+          metricLabel="Total Tunggakan Terdeteksi"
+          colorScheme="arrears"
+        />
+        <LeafletHeatmap 
+          points={paymentHeatmapData}
+          title="Peta Lokasi Pembayaran Pajak"
+          subtitle="Kantor SAMSAT Aktif"
+          metricLabel="Total PKB Terkumpul"
+          colorScheme="payments"
+        />
       </motion.div>
 
       {/* ... (Previous charts remain) ... */}
@@ -77,23 +102,22 @@ export function ChartsGrid({ data, arrearsByYearData, arrearsByLocationData }: C
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie 
-                    data={complianceDataConstant} 
+                    data={complianceData} 
                     innerRadius={70} 
                     outerRadius={90} 
                     paddingAngle={8} 
                     dataKey="value"
-                    label={({ percent }) => percent !== undefined ? `${(percent * 100).toFixed(0)}%` : ''}
+                    label={({ percent }) => (percent !== undefined && percent > 0) ? `${(percent * 100).toFixed(0)}%` : ''}
                     labelLine={false}
                   >
-                    {complianceDataConstant.map((_, i) => <Cell key={i} fill={COMPLIANCE_COLORS[i % COMPLIANCE_COLORS.length]} stroke="none" />)}
+                    {complianceData.map((_, i) => <Cell key={i} fill={COMPLIANCE_COLORS[i % COMPLIANCE_COLORS.length]} stroke="none" />)}
                   </Pie>
                   <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.08)', fontSize: '14px' }} />
                 </PieChart>
-
               </ResponsiveContainer>
             </div>
             <div className="flex justify-center gap-4 mt-2">
-              {complianceDataConstant.map((item, i) => (
+              {complianceData.map((item, i) => (
                 <div key={i} className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COMPLIANCE_COLORS[i % COMPLIANCE_COLORS.length] }}></div>
                   <span className="text-[10px] font-bold text-slate-500 uppercase">{item.name}</span>
@@ -108,7 +132,7 @@ export function ChartsGrid({ data, arrearsByYearData, arrearsByLocationData }: C
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}>
         <Card className="h-full border-slate-200/60 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Potensi per Kota (Stacked)</CardTitle>
+            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Potensi per Kecamatan (Stacked)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-64">
@@ -144,7 +168,7 @@ export function ChartsGrid({ data, arrearsByYearData, arrearsByLocationData }: C
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}>
         <Card className="h-full border-slate-200/60 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Perbandingan Wilayah</CardTitle>
+            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Perbandingan Kecamatan</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-64">
@@ -176,7 +200,7 @@ export function ChartsGrid({ data, arrearsByYearData, arrearsByLocationData }: C
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.4 }}>
         <Card className="h-full border-slate-200/60 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Detail Tunggakan</CardTitle>
+            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Detail Tunggakan per Kecamatan</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-64">
@@ -210,7 +234,7 @@ export function ChartsGrid({ data, arrearsByYearData, arrearsByLocationData }: C
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.5 }}>
         <Card className="h-full border-slate-200/60 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Tren Keterlambatan</CardTitle>
+            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Tren Keterlambatan Kecamatan</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-64">
@@ -350,7 +374,7 @@ export function ChartsGrid({ data, arrearsByYearData, arrearsByLocationData }: C
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.7 }}>
         <Card className="h-full border-slate-200/60 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Top 10 Wilayah Tertunggak</CardTitle>
+            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Top 10 Kecamatan Tertunggak</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-64">
@@ -475,7 +499,7 @@ export function ChartsGrid({ data, arrearsByYearData, arrearsByLocationData }: C
                </div>
                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
                  <p className="text-[10px] text-slate-400 uppercase font-bold">Data Points</p>
-                 <p className="text-sm text-slate-700 font-semibold">7,299 Rows</p>
+                 <p className="text-sm text-slate-700 font-semibold">{formatNumber(totalRows)} Rows</p>
                </div>
                <div className="p-3 rounded-xl bg-emerald-50/50 border border-emerald-100">
                  <p className="text-[10px] text-emerald-600 uppercase font-bold">Trend</p>
@@ -485,7 +509,67 @@ export function ChartsGrid({ data, arrearsByYearData, arrearsByLocationData }: C
           </CardContent>
         </Card>
       </motion.div>
-
+      
+      {/* Peramalan per Kecamatan */}
+      {kecamatanForecastData && (
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.8 }} className="lg:col-span-2">
+          <Card className="border-slate-200/60 shadow-sm overflow-hidden relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/30 to-transparent" />
+            <CardHeader className="relative z-10 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Prediksi Kontribusi PKB per Kecamatan</CardTitle>
+                <p className="text-[10px] text-slate-400 mt-1 uppercase">Perbandingan Tren Proyeksi antar Wilayah</p>
+              </div>
+              <TrendingUp className="h-5 w-5 text-indigo-400" />
+            </CardHeader>
+            <CardContent className="relative z-10">
+              <div className="h-80 mt-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={kecamatanForecastData.data} margin={{ top: 10, right: 30, left: -10, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis 
+                      dataKey="x" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: '500' }} 
+                      dy={10}
+                    />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 10, fill: '#64748b' }}
+                      tickFormatter={(v) => `${v}jt`}
+                    />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#fff', border: 'none', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }}
+                      itemStyle={{ fontSize: '11px', fontWeight: '600' }}
+                    />
+                    <Legend 
+                        verticalAlign="top" 
+                        align="right" 
+                        wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: '20px' }}
+                    />
+                    {kecamatanForecastData.kecamatanList.map((kec, i) => (
+                      <Line 
+                        key={kec}
+                        name={kec}
+                        type="monotone" 
+                        dataKey={kec} 
+                        stroke={["#4f46e5", "#f59e0b", "#ec4899", "#10b981", "#3b82f6", "#8b5cf6", "#f43f5e"][i % 7]} 
+                        strokeWidth={2} 
+                        dot={{ r: 2 }}
+                        activeDot={{ r: 4 }}
+                        connectNulls
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-4 italic text-center uppercase tracking-wide">Grafik menampilkan data historis dan proyeksi 3 bulan ke depan secara berkelanjutan</p>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
     </div>
   );
