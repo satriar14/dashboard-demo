@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from 'react';
 import { 
   BarChart, Bar, PieChart, Pie, Cell, ScatterChart, Scatter, 
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area,
@@ -16,6 +17,8 @@ const LeafletHeatmap = dynamic(() => import("./leaflet-heatmap"), {
 });
 import { 
   CityData,
+  ArrearsByYear,
+  ArrearsByLocation,
   RAW_CITY_DATA, 
   complianceDataConstant, 
   forecastData, 
@@ -27,16 +30,26 @@ import {
 
 interface ChartsGridProps {
   data: CityData[];
+  arrearsByYearData: ArrearsByYear[];
+  arrearsByLocationData: ArrearsByLocation[];
 }
 
-export function ChartsGrid({ data }: ChartsGridProps) {
-  const riskData = data.map(city => ({
+export function ChartsGrid({ data, arrearsByYearData, arrearsByLocationData }: ChartsGridProps) {
+  const top10Data = useMemo(() => data.slice(0, 10), [data]);
+  
+  const riskData = useMemo(() => data.map(city => ({
     name: city.name,
-    impact: Math.round((city.tunggakan / city.potensi) * 100),
+    impact: Math.round((city.tunggakan / (city.potensi || 1)) * 100),
     probability: Math.min(Math.round((city.keterlambatan / 30) * 100), 100),
     tunggakan: city.tunggakan,
     keterlambatan: city.keterlambatan
-  }));
+  })), [data]);
+
+  const sortedArrearsByYear = useMemo(() => {
+    return [...arrearsByYearData]
+      .sort((a, b) => parseInt(a.tahun_buat) - parseInt(b.tahun_buat))
+      .slice(-12); // Show last 12 years of production
+  }, [arrearsByYearData]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -100,7 +113,7 @@ export function ChartsGrid({ data }: ChartsGridProps) {
           <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data} margin={{ top: 40, right: 20, left: 10, bottom: 60 }}>
+                <BarChart data={top10Data} margin={{ top: 40, right: 20, left: 10, bottom: 60 }}>
                   <CartesianGrid strokeDasharray="0" vertical={false} stroke="#f1f5f9" />
                   <XAxis 
                     dataKey="name" 
@@ -136,7 +149,7 @@ export function ChartsGrid({ data }: ChartsGridProps) {
           <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data} layout="vertical" margin={{ left: 40, right: 40, bottom: 20 }}>
+                <BarChart data={top10Data} layout="vertical" margin={{ left: 40, right: 40, bottom: 20 }}>
                   <XAxis type="number" hide />
                   <YAxis 
                     dataKey="name" 
@@ -168,7 +181,7 @@ export function ChartsGrid({ data }: ChartsGridProps) {
           <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data} margin={{ top: 40, right: 20, left: 10, bottom: 60 }}>
+                <BarChart data={top10Data} margin={{ top: 40, right: 20, left: 10, bottom: 60 }}>
                   <XAxis 
                     dataKey="name" 
                     interval={0} 
@@ -202,7 +215,7 @@ export function ChartsGrid({ data }: ChartsGridProps) {
           <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data} margin={{ top: 30, right: 20, left: 10, bottom: 60 }}>
+                <AreaChart data={top10Data} margin={{ top: 30, right: 20, left: 10, bottom: 60 }}>
                   <defs>
                     <linearGradient id="colorAcc" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor={COLORS.warning} stopOpacity={0.1}/>
@@ -267,7 +280,7 @@ export function ChartsGrid({ data }: ChartsGridProps) {
                       if (active && payload && payload.length) {
                         const data = payload[0].payload;
                         return (
-                          <div className="bg-white p-3 border border-slate-200 shadow-xl rounded-xl text-xs">
+                          <div className="bg-white p-3 border border-slate-200 shadow-xl rounded-xl text-[13px]">
                             <p className="font-bold text-indigo-600 mb-1">{data.name}</p>
                             <div className="space-y-1 text-slate-600">
                               <p>Impact: <span className="font-bold text-slate-900">{data.impact}%</span></p>
@@ -289,6 +302,96 @@ export function ChartsGrid({ data }: ChartsGridProps) {
         </Card>
       </motion.div>
 
+      {/* Tunggakan Berdasarkan Tahun Produksi */}
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.65 }}>
+        <Card className="h-full border-slate-200/60 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Tunggakan Per Tahun Produksi</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={sortedArrearsByYear} margin={{ top: 30, right: 20, left: 10, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="0" vertical={false} stroke="#f1f5f9" />
+                  <XAxis 
+                    dataKey="tahun_buat" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 10, fontWeight: '600', fill: '#94a3b8' }} 
+                  />
+                  <YAxis hide />
+                  <Tooltip 
+                    cursor={{ fill: '#f8fafc' }} 
+                    contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', fontSize: '14px' }}
+                    formatter={(v: any) => [`${v} Kendaraan`, 'Jumlah Tunggakan']}
+                  />
+                  <Bar 
+                    dataKey="tunggak" 
+                    fill={COLORS.primary} 
+                    radius={[6, 6, 0, 0]} 
+                    barSize={24}
+                  >
+                    <LabelList 
+                      dataKey="tunggak" 
+                      position="top" 
+                      style={{ fontSize: '10px', fontWeight: 'bold', fill: '#4f46e5' }} 
+                      offset={10} 
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-2 italic text-center uppercase tracking-wide">Data berdasarkan 12 tahun produksi terakhir</p>
+          </CardContent>
+        </Card>
+      </motion.div>
+      
+      {/* Tunggakan Berdasarkan Wilayah */}
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.7 }}>
+        <Card className="h-full border-slate-200/60 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Top 10 Wilayah Tertunggak</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={arrearsByLocationData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="0" horizontal={false} stroke="#f1f5f9" />
+                  <XAxis type="number" hide />
+                  <YAxis 
+                    dataKey="name" 
+                    type="category" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 9, fontWeight: '600', fill: '#64748b' }} 
+                    width={100}
+                  />
+                  <Tooltip 
+                    cursor={{ fill: '#f8fafc' }} 
+                    contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', fontSize: '14px' }}
+                    formatter={(v: any) => [`${v} Kendaraan`, 'Jumlah Tunggakan']}
+                  />
+                  <Bar 
+                    dataKey="jumlah_kendaraan" 
+                    fill={COLORS.danger} 
+                    radius={[0, 4, 4, 0]} 
+                    barSize={16}
+                    opacity={0.9}
+                  >
+                    <LabelList 
+                      dataKey="jumlah_kendaraan" 
+                      position="right" 
+                      style={{ fontSize: '9px', fontWeight: 'bold', fill: '#f43f5e' }} 
+                      offset={10} 
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-2 italic text-center uppercase tracking-wide">Wilayah dengan jumlah tunggakan tertinggi</p>
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Peramalan (Forecasting) */}
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.7 }} className="lg:col-span-2">

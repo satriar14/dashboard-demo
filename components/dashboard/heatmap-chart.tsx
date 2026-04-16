@@ -82,9 +82,9 @@ export function HeatmapChart({ data }: HeatmapChartProps) {
                           </TooltipTrigger>
                           <TooltipContent className="bg-slate-900 text-white border-0 py-2 px-3 shadow-2xl rounded-xl">
                             <div className="space-y-1">
-                              <p className="text-[10px] uppercase font-bold text-slate-400">{city.name}</p>
-                              <p className="text-xs font-bold">{metric.label}: <span className="text-indigo-400">{formatNumber(value as number)}</span></p>
-                              <p className="text-[9px] text-slate-500 italic">Intensitas {Math.round(intensity)}% terhadap Max</p>
+                              <p className="text-[13px] uppercase font-bold text-slate-400">{city.name}</p>
+                              <p className="text-[13px] font-bold">{metric.label}: <span className="text-indigo-400">{formatNumber(value as number)}</span></p>
+                              <p className="text-[13px] text-slate-500 italic">Intensitas {Math.round(intensity)}% terhadap Max</p>
                             </div>
                           </TooltipContent>
                         </Tooltip>

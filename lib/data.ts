@@ -22,6 +22,37 @@ export type DetailedData = {
   opsen: number;
   status: 'Critical' | 'Review' | 'Lunas' | 'Tertunggak';
   date: string;
+  // Detail Kendaraan
+  merek?: string;
+  tipe?: string;
+  tahun_buat?: string;
+  bahan_bakar?: string;
+  jenis_kendaraan?: string;
+  warna_plat?: string;
+  nomor_mesin?: string;
+  nomor_rangka?: string;
+  nik?: string;
+  no_hp?: string;
+  // Detail Pajak Tambahan
+  bbnkb?: number;
+  opsen_bbnkb?: number;
+  swdkllj?: number;
+  denda_swdkllj?: number;
+  // Detail Alamat
+  kecamatan?: string;
+  desa_kelurahan?: string;
+  kabupaten?: string;
+  masa_pajak_sampai?: string;
+};
+
+export type ArrearsByYear = {
+  tahun_buat: string;
+  tunggak: number;
+};
+
+export type ArrearsByLocation = {
+  name: string;
+  jumlah_kendaraan: number;
 };
 
 export const RAW_CITY_DATA: CityData[] = [

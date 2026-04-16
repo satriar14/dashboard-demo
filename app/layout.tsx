@@ -9,8 +9,8 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "SIGAP Analytics | BAPENDA KALTENG",
-  description: "Dashboard Operasional Kalimantan Tengah",
+  title: "SADAR Analytics | BAPENDA KALTENG",
+  description: "Sistem Analitik Data untuk Aksi Responsif Pajak Kendaraan (SADAR) - Bapenda Kalimantan Tengah",
 };
 
 export default function RootLayout({
