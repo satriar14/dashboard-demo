@@ -65,14 +65,14 @@ export function HeatmapChart({ data }: HeatmapChartProps) {
                   {city.name}
                 </div>
                 <div className="grid grid-cols-4 gap-1 px-2">
-                  <TooltipProvider delayDuration={0}>
+                  <TooltipProvider>
                     {metrics.map(metric => {
                       const value = city[metric.key as keyof CityData];
                       const intensity = city.intensities[metric.key as keyof typeof city.intensities];
                       
                       return (
                         <Tooltip key={metric.key}>
-                          <TooltipTrigger asChild>
+                          <TooltipTrigger>
                             <div 
                               className={`h-8 rounded-sm transition-transform hover:scale-105 cursor-pointer ${metric.color}`}
                               style={{ 

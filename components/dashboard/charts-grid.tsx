@@ -142,7 +142,7 @@ export function ChartsGrid({ data }: ChartsGridProps) {
                     tick={{ fontSize: 10, fontWeight: '600', fill: '#64748b' }} 
                     width={130} 
                   />
-                  <Tooltip formatter={(v: number) => formatNumber(v)} contentStyle={{ borderRadius: '10px', border: 'none', fontSize: '14px' }} />
+                  <Tooltip formatter={(v: any) => formatNumber(Number(v))} contentStyle={{ borderRadius: '10px', border: 'none', fontSize: '14px' }} />
                   <Bar dataKey="pkb" fill={COLORS.secondary} radius={[0, 6, 6, 0]} barSize={12}>
                     <LabelList dataKey="pkb" position="right" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} offset={10} formatter={(v: any) => formatNumber(Number(v))} />
                   </Bar>
