@@ -40,6 +40,11 @@ export function ChartsGrid({ data }: ChartsGridProps) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Leaflet Heatmap */}
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }} className="lg:col-span-2 order-first">
+        <LeafletHeatmap data={data} />
+      </motion.div>
+
       {/* ... (Previous charts remain) ... */}
       
       {/* (Self-correction: I should keep the existing ones and ADD/Update the Risk one) */}
@@ -284,10 +289,6 @@ export function ChartsGrid({ data }: ChartsGridProps) {
         </Card>
       </motion.div>
 
-      {/* Leaflet Heatmap */}
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.65 }} className="lg:col-span-2">
-        <LeafletHeatmap data={data} />
-      </motion.div>
 
       {/* Peramalan (Forecasting) */}
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.7 }} className="lg:col-span-2">
