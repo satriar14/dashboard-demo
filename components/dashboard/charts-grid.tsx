@@ -8,6 +8,12 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { MoreVertical, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
+import dynamic from "next/dynamic";
+
+const LeafletHeatmap = dynamic(() => import("./leaflet-heatmap"), { 
+  ssr: false,
+  loading: () => <div className="h-[500px] w-full bg-slate-100 animate-pulse rounded-xl flex items-center justify-center text-slate-400 font-medium">Memuat Peta...</div>
+});
 import { 
   CityData,
   RAW_CITY_DATA, 
@@ -105,7 +111,7 @@ export function ChartsGrid({ data }: ChartsGridProps) {
                   <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', fontSize: '14px' }} />
                   <Bar name="Pokok PKB" dataKey="pkb" stackId="a" fill={CHART_PALETTE[0]} barSize={24} />
                   <Bar name="Tunggakan" dataKey="tunggakan" stackId="a" fill={CHART_PALETTE[1]} radius={[4, 4, 0, 0]} barSize={24}>
-                    <LabelList dataKey="potensi" position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} offset={10} formatter={(v: number) => formatNumber(v)} />
+                    <LabelList dataKey="potensi" position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} offset={10} formatter={(v: any) => formatNumber(Number(v))} />
                   </Bar>
                 </BarChart>
 
@@ -138,7 +144,7 @@ export function ChartsGrid({ data }: ChartsGridProps) {
                   />
                   <Tooltip formatter={(v: number) => formatNumber(v)} contentStyle={{ borderRadius: '10px', border: 'none', fontSize: '14px' }} />
                   <Bar dataKey="pkb" fill={COLORS.secondary} radius={[0, 6, 6, 0]} barSize={12}>
-                    <LabelList dataKey="pkb" position="right" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} offset={10} formatter={(v: number) => formatNumber(v)} />
+                    <LabelList dataKey="pkb" position="right" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} offset={10} formatter={(v: any) => formatNumber(Number(v))} />
                   </Bar>
                 </BarChart>
 
@@ -171,7 +177,7 @@ export function ChartsGrid({ data }: ChartsGridProps) {
                   <YAxis hide />
                   <Tooltip cursor={{ fill: '#f8fafc' }} />
                   <Bar dataKey="tunggakan" fill={COLORS.danger} radius={[6, 6, 0, 0]} barSize={24} opacity={0.8}>
-                    <LabelList dataKey="tunggakan" position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#f43f5e' }} offset={10} formatter={(v: number) => formatNumber(v)} />
+                    <LabelList dataKey="tunggakan" position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#f43f5e' }} offset={10} formatter={(v: any) => formatNumber(Number(v))} />
                   </Bar>
                 </BarChart>
 
@@ -210,7 +216,7 @@ export function ChartsGrid({ data }: ChartsGridProps) {
                   />
                   <Tooltip />
                   <Area type="monotone" dataKey="keterlambatan" stroke={COLORS.warning} fill="url(#colorAcc)" strokeWidth={4}>
-                    <LabelList dataKey="keterlambatan" position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#f59e0b' }} offset={10} formatter={(v: number) => formatNumber(v)} />
+                    <LabelList dataKey="keterlambatan" position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#f59e0b' }} offset={10} formatter={(v: any) => formatNumber(Number(v))} />
                   </Area>
                 </AreaChart>
 
@@ -278,6 +284,11 @@ export function ChartsGrid({ data }: ChartsGridProps) {
         </Card>
       </motion.div>
 
+      {/* Leaflet Heatmap */}
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.65 }} className="lg:col-span-2">
+        <LeafletHeatmap data={data} />
+      </motion.div>
+
       {/* Peramalan (Forecasting) */}
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.7 }} className="lg:col-span-2">
         <Card className="border-slate-200/60 shadow-sm overflow-hidden relative">
@@ -330,7 +341,7 @@ export function ChartsGrid({ data }: ChartsGridProps) {
                     dot={{ r: 3, fill: '#4f46e5', strokeWidth: 2, stroke: '#fff' }}
                     connectNulls
                   >
-                    <LabelList dataKey="real" position="top" style={{ fontSize: '9px', fontWeight: 'bold', fill: '#4f46e5' }} offset={10} formatter={(v: number) => formatNumber(v)} />
+                    <LabelList dataKey="real" position="top" style={{ fontSize: '9px', fontWeight: 'bold', fill: '#4f46e5' }} offset={10} formatter={(v: any) => formatNumber(Number(v))} />
                   </Area>
                   <Area 
                     name="Proyeksi (Juta)"
@@ -343,7 +354,7 @@ export function ChartsGrid({ data }: ChartsGridProps) {
                     dot={{ r: 3, fill: '#818cf8', strokeWidth: 2, stroke: '#fff' }}
                     connectNulls
                   >
-                    <LabelList dataKey="forecast" position="top" style={{ fontSize: '9px', fontWeight: 'bold', fill: '#818cf8' }} offset={10} formatter={(v: number) => formatNumber(v)} />
+                    <LabelList dataKey="forecast" position="top" style={{ fontSize: '9px', fontWeight: 'bold', fill: '#818cf8' }} offset={10} formatter={(v: any) => formatNumber(Number(v))} />
                   </Area>
 
                 </AreaChart>
