@@ -50,7 +50,7 @@ export const RAW_DETAILED_DATA: DetailedData[] = [
   { id: "SG11", samsat: "BARITO UTARA", nopol: "KH4008EJ", pemilik: "WILDAWATI", alamat: "JL. MERANTI RT 009/ KEL.LANJAS KEC.TEWEH TENGAH,KA...", pokok: 99500, denda: 0, opsen: 65700, status: "Lunas", date: "2025-01-30" },
   { id: "SG12", samsat: "SUKAMARA", nopol: "KH3942SJ", pemilik: "KUSNO", alamat: "DS.PEMPANING RT.001/000 KEC.BALAI RIAM KAB.SUKAMAR...", pokok: 104900, denda: 0, opsen: 69300, status: "Lunas", date: "2025-01-30" },
   { id: "SG13", samsat: "KOTAWARINGIN TIMUR", nopol: "KH1175FO", pemilik: "SATRIA WANI", alamat: "JL.MUCHRAN ALI NO.64 RT.006/002 KEC. BAAMANG SAMPI...", pokok: 1794000, denda: 0, opsen: 1184100, status: "Lunas", date: "2025-01-24" },
-  { id: "SG14", samsat: "KOTAWARINGIN TIMUR", nopol: "KH8826LA", pemilik: "SETYO HARTONO", alamat: "JL.JAMBU RT.003/002 KEL.AGUNG MULYA KEC.TELAGA ANT...", pokok: 2628700, denda: 80000, status: "Review", date: "2025-01-31" }
+  { id: "SG14", samsat: "KOTAWARINGIN TIMUR", nopol: "KH8826LA", pemilik: "SETYO HARTONO", alamat: "JL.JAMBU RT.003/002 KEL.AGUNG MULYA KEC.TELAGA ANT...", pokok: 2628700, denda: 80000, opsen: 1735000, status: "Review", date: "2025-01-31" }
 ];
 
 export const complianceDataConstant = [
