@@ -48,7 +48,6 @@ export const COORDINATES: Record<string, { lat: number; lng: number }> = {
   'SAMSAT PANGKALAN BUN': { lat: -2.6979, lng: 111.6240 },
   'SAMKEL 2 PANGKALAN BUN': { lat: -2.7100, lng: 111.6180 },
   'MPP PANGKALAN BUN': { lat: -2.6950, lng: 111.6300 },
-  'PALANGKA RAYA': { lat: -2.2139, lng: 113.9136 },
   'KUALA KAPUAS': { lat: -3.0061, lng: 114.3600 },
   'SAMSAT KUALA KAPUAS': { lat: -3.0061, lng: 114.3600 },
   'SAMSAT PALANGKA RAYA': { lat: -2.2139, lng: 113.9136 },

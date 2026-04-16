@@ -377,7 +377,7 @@ export async function getKecamatanForecastSeries(filters: DashboardFilters) {
   const data = await getDashboardData();
   const filtered = applyFilters(data, filters);
   
-  const kecamatanList = Array.from(new Set(filtered.map(it => it.kecamatan).filter(Boolean))).sort();
+  const kecamatanList = Array.from(new Set(filtered.map(it => it.kecamatan).filter(Boolean))).sort() as string[];
   
   const pivot: Record<string, Record<string, number>> = {};
   
