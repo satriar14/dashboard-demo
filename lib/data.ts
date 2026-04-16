@@ -54,7 +54,10 @@ export const RAW_DETAILED_DATA: DetailedData[] = [
   { id: "SG11", samsat: "BARITO UTARA", nopol: "KH4008EJ", pemilik: "WILDAWATI", alamat: "JL. MERANTI RT 009/ KEL.LANJAS KEC.TEWEH TENGAH,KA...", pokok: 99500, denda: 0, opsen: 65700, status: "Lunas", date: "2025-01-30" },
   { id: "SG12", samsat: "SUKAMARA", nopol: "KH3942SJ", pemilik: "KUSNO", alamat: "DS.PEMPANING RT.001/000 KEC.BALAI RIAM KAB.SUKAMAR...", pokok: 104900, denda: 0, opsen: 69300, status: "Lunas", date: "2025-01-30" },
   { id: "SG13", samsat: "KOTAWARINGIN TIMUR", nopol: "KH1175FO", pemilik: "SATRIA WANI", alamat: "JL.MUCHRAN ALI NO.64 RT.006/002 KEC. BAAMANG SAMPI...", pokok: 1794000, denda: 0, opsen: 1184100, status: "Lunas", date: "2025-01-24" },
-  { id: "SG14", samsat: "KOTAWARINGIN TIMUR", nopol: "KH8826LA", pemilik: "SETYO HARTONO", alamat: "JL.JAMBU RT.003/002 KEL.AGUNG MULYA KEC.TELAGA ANT...", pokok: 2628700, denda: 80000, opsen: 1735000, status: "Review", date: "2025-01-31" }
+  { id: "SG14", samsat: "KOTAWARINGIN TIMUR", nopol: "KH8826LA", pemilik: "SETYO HARTONO", alamat: "JL.JAMBU RT.003/002 KEL.AGUNG MULYA KEC.TELAGA ANT...", pokok: 2628700, denda: 80000, opsen: 1735000, status: "Review", date: "2025-01-31" },
+  { id: "SG15", samsat: "PALANGKA RAYA", nopol: "KH1122AA", pemilik: "BUDI SANTOSO", alamat: "JL. TAMBUN BUNGAI NO. 10", pokok: 450000, denda: 0, opsen: 250000, status: "Lunas", date: "2024-12-15" },
+  { id: "SG16", samsat: "KOTAWARINGIN TIMUR", nopol: "KH3344BB", pemilik: "ANWAR SADAT", alamat: "JL. JEND SUDIRMAN KM 6", pokok: 890000, denda: 45000, opsen: 560000, status: "Tertunggak", date: "2025-02-05" },
+  { id: "SG17", samsat: "KAPUAS", nopol: "KH5566CC", pemilik: "DIANA PUSPITA", alamat: "JL. AHMAD YANI NO. 45", pokok: 1200000, denda: 0, opsen: 800000, status: "Lunas", date: "2024-11-20" }
 ];
 
 export const complianceDataConstant = [

@@ -35,6 +35,43 @@ export default function DashboardPage() {
   const [selectedCity, setSelectedCity] = useState('Semua');
   const [selectedGolongan, setSelectedGolongan] = useState('Semua');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // New Date Filters
+  const [selectedYear, setSelectedYear] = useState('Semua');
+  const [selectedMonth, setSelectedMonth] = useState('Semua');
+  const [selectedDay, setSelectedDay] = useState('Semua');
+
+  const months = [
+    { value: "01", label: "Januari" },
+    { value: "02", label: "Februari" },
+    { value: "03", label: "Maret" },
+    { value: "04", label: "April" },
+    { value: "05", label: "Mei" },
+    { value: "06", label: "Juni" },
+    { value: "07", label: "Juli" },
+    { value: "08", label: "Agustus" },
+    { value: "09", label: "September" },
+    { value: "10", label: "Oktober" },
+    { value: "11", label: "November" },
+    { value: "12", label: "Desember" },
+  ];
+
+  const filteredDetailedData = useMemo(() => {
+    return RAW_DETAILED_DATA.filter(item => {
+      const cityMatch = selectedCity === 'Semua' || item.samsat.toLowerCase() === selectedCity.toLowerCase();
+      const searchMatch = 
+        item.nopol.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        item.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.pemilik.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const [year, month, day] = item.date.split('-');
+      const yearMatch = selectedYear === 'Semua' || year === selectedYear;
+      const monthMatch = selectedMonth === 'Semua' || month === selectedMonth;
+      const dayMatch = selectedDay === 'Semua' || parseInt(day).toString() === selectedDay;
+
+      return cityMatch && searchMatch && yearMatch && monthMatch && dayMatch;
+    });
+  }, [selectedCity, searchQuery, selectedYear, selectedMonth, selectedDay]);
 
   const filteredCityData = useMemo(() => {
     return RAW_CITY_DATA.filter(item => {
@@ -44,18 +81,22 @@ export default function DashboardPage() {
     });
   }, [selectedCity, selectedGolongan]);
 
-  const filteredDetailedData = useMemo(() => {
-    return RAW_DETAILED_DATA.filter(item => {
-      const cityMatch = selectedCity === 'Semua' || item.samsat.toLowerCase() === selectedCity.toLowerCase();
-      const searchMatch = 
-        item.nopol.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        item.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.pemilik.toLowerCase().includes(searchQuery.toLowerCase());
-      return cityMatch && searchMatch;
-    });
-  }, [selectedCity, searchQuery]);
-
   const stats = useMemo(() => {
+    const isDateFiltered = selectedYear !== 'Semua' || selectedMonth !== 'Semua' || selectedDay !== 'Semua';
+
+    if (isDateFiltered) {
+      // derive stats from detailed data for real-time filter feel
+      const totalPotensiVal = filteredDetailedData.reduce((acc, curr) => acc + (curr.pokok + curr.opsen), 0);
+      const totalTunggakanVal = filteredDetailedData.reduce((acc, curr) => acc + (curr.status === 'Tertunggak' ? (curr.pokok + curr.opsen) : 0), 0);
+      
+      return { 
+        totalPotensi: totalPotensiVal / 1000000, 
+        totalTunggakan: totalTunggakanVal / 1000000, 
+        avgDelay: 12, // Placeholder for date-specific delay
+        kepatuhan: totalPotensiVal > 0 ? (((totalPotensiVal - totalTunggakanVal) / totalPotensiVal) * 100).toFixed(1) : "0"
+      };
+    }
+
     const totalPotensi = filteredCityData.reduce((acc, curr) => acc + curr.potensi, 0);
     const totalTunggakan = filteredCityData.reduce((acc, curr) => acc + curr.tunggakan, 0);
     const avgDelay = filteredCityData.length > 0 
@@ -64,7 +105,16 @@ export default function DashboardPage() {
     const kepatuhan = totalPotensi > 0 ? (((totalPotensi - totalTunggakan) / totalPotensi) * 100).toFixed(1) : "0";
 
     return { totalPotensi, totalTunggakan, avgDelay, kepatuhan };
-  }, [filteredCityData]);
+  }, [filteredCityData, filteredDetailedData, selectedYear, selectedMonth, selectedDay]);
+
+  const resetFilters = () => {
+    setSelectedCity('Semua');
+    setSelectedGolongan('Semua');
+    setSearchQuery('');
+    setSelectedYear('Semua');
+    setSelectedMonth('Semua');
+    setSelectedDay('Semua');
+  };
 
   return (
     <div className="min-h-screen bg-[#fcfcfd] text-slate-900 selection:bg-indigo-100 pb-20">
@@ -114,46 +164,90 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Global Filters */}
-        <div className="flex flex-wrap items-center gap-4 p-4 bg-white border border-slate-200/60 rounded-2xl shadow-sm">
-          <div className="flex items-center gap-2 text-slate-400 mr-2">
-            <FilterIcon size={16} />
-            <span className="text-xs font-bold uppercase tracking-widest">Filter:</span>
+        <div className="flex flex-wrap items-end gap-5 p-5 bg-white border border-slate-200/60 rounded-2xl shadow-sm">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Samsat / Loket</label>
+            <Select value={selectedCity} onValueChange={(value) => value && setSelectedCity(value)}>
+              <SelectTrigger className="w-[160px] h-10 border-slate-200 rounded-lg text-xs font-semibold bg-slate-50/50">
+                <SelectValue placeholder="Loket" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Semua">Semua Loket</SelectItem>
+                <SelectItem value="PALANGKA RAYA">Samsat Palangka Raya</SelectItem>
+                <SelectItem value="KOTAWARINGIN TIMUR">Samsat Sampit</SelectItem>
+                <SelectItem value="KAPUAS">Samsat Kapuas</SelectItem>
+                <SelectItem value="KOTAWARINGIN BARAT">Samsat Pangkalan Bun</SelectItem>
+                <SelectItem value="KATINGAN">Samsat Kasongan</SelectItem>
+                <SelectItem value="BARITO SELATAN">Samsat Buntok</SelectItem>
+                <SelectItem value="SUKAMARA">Samsat Sukamara</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          
-          <Select value={selectedCity} onValueChange={(value) => value && setSelectedCity(value)}>
-            <SelectTrigger className="w-[200px] h-10 border-slate-200 rounded-lg text-xs font-semibold">
-              <SelectValue placeholder="Semua Loket" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Semua">Semua Loket Samsat</SelectItem>
-              <SelectItem value="PALANGKA RAYA">Samsat Palangka Raya</SelectItem>
-              <SelectItem value="KOTAWARINGIN TIMUR">Samsat Sampit</SelectItem>
-              <SelectItem value="KAPUAS">Samsat Kapuas</SelectItem>
-              <SelectItem value="KOTAWARINGIN BARAT">Samsat Pangkalan Bun</SelectItem>
-              <SelectItem value="KATINGAN">Samsat Kasongan</SelectItem>
-              <SelectItem value="BARITO SELATAN">Samsat Buntok</SelectItem>
-              <SelectItem value="SUKAMARA">Samsat Sukamara</SelectItem>
-            </SelectContent>
-          </Select>
 
-          <Select value={selectedGolongan} onValueChange={(value) => value && setSelectedGolongan(value)}>
-            <SelectTrigger className="w-[180px] h-10 border-slate-200 rounded-lg text-xs font-semibold">
-              <SelectValue placeholder="Semua Golongan" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Semua">Semua Golongan</SelectItem>
-              <SelectItem value="B">Pribadi (B)</SelectItem>
-              <SelectItem value="DP">Dinas (DP)</SelectItem>
-              <SelectItem value="U">Umum (U)</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Tahun</label>
+            <Select value={selectedYear} onValueChange={(value) => value && setSelectedYear(value)}>
+              <SelectTrigger className="w-[100px] h-10 border-slate-200 rounded-lg text-xs font-semibold bg-slate-50/50">
+                <SelectValue placeholder="Tahun" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Semua">Semua</SelectItem>
+                <SelectItem value="2024">2024</SelectItem>
+                <SelectItem value="2025">2025</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-          {(selectedCity !== 'Semua' || selectedGolongan !== 'Semua' || searchQuery !== '') && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Bulan</label>
+            <Select value={selectedMonth} onValueChange={(value) => value && setSelectedMonth(value)}>
+              <SelectTrigger className="w-[130px] h-10 border-slate-200 rounded-lg text-xs font-semibold bg-slate-50/50">
+                <SelectValue placeholder="Bulan" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Semua">Semua</SelectItem>
+                {months.map(m => (
+                  <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Tanggal</label>
+            <Select value={selectedDay} onValueChange={(value) => value && setSelectedDay(value)}>
+              <SelectTrigger className="w-[90px] h-10 border-slate-200 rounded-lg text-xs font-semibold bg-slate-50/50">
+                <SelectValue placeholder="Tgl" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Semua">Semua</SelectItem>
+                {Array.from({ length: 31 }, (_, i) => (
+                  <SelectItem key={i + 1} value={(i + 1).toString()}>{i + 1}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Golongan</label>
+            <Select value={selectedGolongan} onValueChange={(value) => value && setSelectedGolongan(value)}>
+              <SelectTrigger className="w-[140px] h-10 border-slate-200 rounded-lg text-xs font-semibold bg-slate-50/50">
+                <SelectValue placeholder="Golongan" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Semua">Semua</SelectItem>
+                <SelectItem value="B">Pribadi (B)</SelectItem>
+                <SelectItem value="DP">Dinas (DP)</SelectItem>
+                <SelectItem value="U">Umum (U)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {(selectedCity !== 'Semua' || selectedGolongan !== 'Semua' || searchQuery !== '' || selectedYear !== 'Semua' || selectedMonth !== 'Semua' || selectedDay !== 'Semua') && (
             <Button 
               variant="link" 
-              onClick={() => { setSelectedCity('Semua'); setSelectedGolongan('Semua'); setSearchQuery(''); }}
-              className="text-xs font-bold text-rose-500 h-10"
+              onClick={resetFilters}
+              className="text-xs font-bold text-rose-500 h-10 ml-auto"
             >
               Reset Filter
             </Button>
