@@ -83,14 +83,16 @@ export async function getDashboardStats(filters: DashboardFilters) {
           COALESCE(denda_swdkllj, 0) + 
           COALESCE(tunggakan_denda_swdkllj, 0)
         ) as total_tunggakan,
-        AVG(CASE WHEN (
+        COALESCE(AVG(CASE WHEN (
           COALESCE(tunggakan_pokok_pkb, 0) + 
           COALESCE(tunggakan_pokok_bbnkb, 0) + 
           COALESCE(opsen_tunggakan_pokok_pkb, 0) + 
           COALESCE(opsen_tunggakan_pokok_bbnkb, 0) + 
           COALESCE(denda_swdkllj, 0) + 
           COALESCE(tunggakan_denda_swdkllj, 0)
-        ) > 0 THEN 12 ELSE 0 END) as avg_delay
+        ) > 0 AND masa_pajak_sampai < CURRENT_DATE
+        THEN DATE_PART('day', CURRENT_DATE - masa_pajak_sampai)
+        END), 0) as avg_delay
       FROM v_kendaraan_transaksi_clean
       ${whereClause}
     `;
@@ -137,7 +139,16 @@ export async function getCitySummary(filters: DashboardFilters): Promise<CityDat
           COALESCE(tunggakan_denda_swdkllj, 0)
         ) as tunggakan,
         SUM(COALESCE(pokok_pkb, 0) + COALESCE(opsen_pokok_pkb, 0)) as potensi,
-        AVG(12) as keterlambatan
+        COALESCE(AVG(CASE WHEN (
+          COALESCE(tunggakan_pokok_pkb, 0) + 
+          COALESCE(tunggakan_pokok_bbnkb, 0) + 
+          COALESCE(opsen_tunggakan_pokok_pkb, 0) + 
+          COALESCE(opsen_tunggakan_pokok_bbnkb, 0) + 
+          COALESCE(denda_swdkllj, 0) + 
+          COALESCE(tunggakan_denda_swdkllj, 0)
+        ) > 0 AND masa_pajak_sampai < CURRENT_DATE
+        THEN DATE_PART('day', CURRENT_DATE - masa_pajak_sampai)
+        END), 0) as keterlambatan
       FROM v_kendaraan_transaksi_clean
       ${whereClause}
       GROUP BY kabupaten
