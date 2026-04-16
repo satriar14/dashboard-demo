@@ -27,7 +27,8 @@ import { ChartsGrid } from "@/components/dashboard/charts-grid";
 import { TransactionTable } from "@/components/dashboard/transaction-table";
 import { 
   RAW_CITY_DATA, 
-  RAW_DETAILED_DATA 
+  RAW_DETAILED_DATA,
+  formatNumber
 } from "@/lib/data";
 
 export default function DashboardPage() {
@@ -37,15 +38,15 @@ export default function DashboardPage() {
 
   const filteredCityData = useMemo(() => {
     return RAW_CITY_DATA.filter(item => {
-      const cityMatch = selectedCity === 'Semua' || item.name === selectedCity;
-      const golMatch = selectedGolongan === 'Semua' || item.golongan === selectedGolongan;
+      const cityMatch = selectedCity === 'Semua' || item.name.toLowerCase() === selectedCity.toLowerCase();
+      const golMatch = selectedGolongan === 'Semua' || item.golongan.toLowerCase() === selectedGolongan.toLowerCase();
       return cityMatch && golMatch;
     });
   }, [selectedCity, selectedGolongan]);
 
   const filteredDetailedData = useMemo(() => {
     return RAW_DETAILED_DATA.filter(item => {
-      const cityMatch = selectedCity === 'Semua' || item.samsat === selectedCity;
+      const cityMatch = selectedCity === 'Semua' || item.samsat.toLowerCase() === selectedCity.toLowerCase();
       const searchMatch = 
         item.nopol.toLowerCase().includes(searchQuery.toLowerCase()) || 
         item.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -126,12 +127,13 @@ export default function DashboardPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="Semua">Semua Loket Samsat</SelectItem>
-              <SelectItem value="Palangka Raya">Samsat Palangka Raya</SelectItem>
-              <SelectItem value="Sampit">Samsat Sampit</SelectItem>
-              <SelectItem value="Kapuas">Samsat Kapuas</SelectItem>
-              <SelectItem value="P. Bun">Samsat Pangkalan Bun</SelectItem>
-              <SelectItem value="Kasongan">Samsat Kasongan</SelectItem>
-              <SelectItem value="Buntok">Samsat Buntok</SelectItem>
+              <SelectItem value="PALANGKA RAYA">Samsat Palangka Raya</SelectItem>
+              <SelectItem value="KOTAWARINGIN TIMUR">Samsat Sampit</SelectItem>
+              <SelectItem value="KAPUAS">Samsat Kapuas</SelectItem>
+              <SelectItem value="KOTAWARINGIN BARAT">Samsat Pangkalan Bun</SelectItem>
+              <SelectItem value="KATINGAN">Samsat Kasongan</SelectItem>
+              <SelectItem value="BARITO SELATAN">Samsat Buntok</SelectItem>
+              <SelectItem value="SUKAMARA">Samsat Sukamara</SelectItem>
             </SelectContent>
           </Select>
 
@@ -160,10 +162,10 @@ export default function DashboardPage() {
 
         {/* KPI Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <KPICard title="Total Potensi" value={`Rp ${stats.totalPotensi}jt`} trend={12} icon={DollarSign} iconColor="indigo" delay={0.1} />
-          <KPICard title="Total Tunggakan" value={`Rp ${stats.totalTunggakan}jt`} trend={-4} icon={AlertCircle} iconColor="rose" delay={0.2} />
+          <KPICard title="Total Potensi" value={`Rp ${formatNumber(stats.totalPotensi)}jt`} trend={12} icon={DollarSign} iconColor="indigo" delay={0.1} />
+          <KPICard title="Total Tunggakan" value={`Rp ${formatNumber(stats.totalTunggakan)}jt`} trend={-4} icon={AlertCircle} iconColor="rose" delay={0.2} />
           <KPICard title="Kepatuhan" value={`${stats.kepatuhan}%`} trend={2} icon={Activity} iconColor="emerald" delay={0.3} />
-          <KPICard title="Rata-rata Terlambat" value={`${stats.avgDelay} Hari`} trend={-8} icon={Clock} iconColor="amber" delay={0.4} />
+          <KPICard title="Rata-rata Terlambat" value={`${formatNumber(stats.avgDelay)} Hari`} trend={-8} icon={Clock} iconColor="amber" delay={0.4} />
         </div>
 
         {/* Charts Section */}
@@ -172,7 +174,7 @@ export default function DashboardPage() {
              <h3 className="text-lg font-bold text-slate-900 tracking-tight">Visualisasi Data</h3>
              <Separator className="flex-1" />
           </div>
-          <ChartsGrid />
+          <ChartsGrid data={filteredCityData} />
         </section>
 
         {/* Table Section */}

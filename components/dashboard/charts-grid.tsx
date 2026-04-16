@@ -9,20 +9,31 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { MoreVertical, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
 import { 
+  CityData,
   RAW_CITY_DATA, 
   complianceDataConstant, 
-  getRiskData, 
   forecastData, 
   COLORS, 
   CHART_PALETTE, 
-  COMPLIANCE_COLORS 
+  COMPLIANCE_COLORS,
+  formatNumber
 } from "@/lib/data";
 
-export function ChartsGrid() {
-  const riskData = getRiskData();
+interface ChartsGridProps {
+  data: CityData[];
+}
+
+export function ChartsGrid({ data }: ChartsGridProps) {
+  const riskData = data.map(city => ({
+    name: city.name,
+    impact: Math.round((city.tunggakan / city.potensi) * 100),
+    probability: Math.min(Math.round((city.keterlambatan / 30) * 100), 100),
+    tunggakan: city.tunggakan,
+    keterlambatan: city.keterlambatan
+  }));
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* ... (Previous charts remain) ... */}
       
       {/* (Self-correction: I should keep the existing ones and ADD/Update the Risk one) */}
@@ -78,14 +89,23 @@ export function ChartsGrid() {
           <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={RAW_CITY_DATA} margin={{ top: 40, right: 20, left: 10, bottom: 10 }}>
+                <BarChart data={data} margin={{ top: 40, right: 20, left: 10, bottom: 60 }}>
                   <CartesianGrid strokeDasharray="0" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: '600', fill: '#94a3b8' }} dy={10} />
+                  <XAxis 
+                    dataKey="name" 
+                    interval={0} 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 9, fontWeight: '600', fill: '#94a3b8' }} 
+                    angle={-45}
+                    textAnchor="end"
+                    dy={10} 
+                  />
                   <YAxis hide />
                   <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', fontSize: '14px' }} />
                   <Bar name="Pokok PKB" dataKey="pkb" stackId="a" fill={CHART_PALETTE[0]} barSize={24} />
                   <Bar name="Tunggakan" dataKey="tunggakan" stackId="a" fill={CHART_PALETTE[1]} radius={[4, 4, 0, 0]} barSize={24}>
-                    <LabelList dataKey="potensi" position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} offset={10} />
+                    <LabelList dataKey="potensi" position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} offset={10} formatter={(v: number) => formatNumber(v)} />
                   </Bar>
                 </BarChart>
 
@@ -105,12 +125,20 @@ export function ChartsGrid() {
           <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={RAW_CITY_DATA} layout="vertical" margin={{ left: 10, right: 40 }}>
+                <BarChart data={data} layout="vertical" margin={{ left: 40, right: 40, bottom: 20 }}>
                   <XAxis type="number" hide />
-                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: '600', fill: '#64748b' }} width={80} />
-                  <Tooltip contentStyle={{ borderRadius: '10px', border: 'none', fontSize: '14px' }} />
+                  <YAxis 
+                    dataKey="name" 
+                    interval={0} 
+                    type="category" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 10, fontWeight: '600', fill: '#64748b' }} 
+                    width={130} 
+                  />
+                  <Tooltip formatter={(v: number) => formatNumber(v)} contentStyle={{ borderRadius: '10px', border: 'none', fontSize: '14px' }} />
                   <Bar dataKey="pkb" fill={COLORS.secondary} radius={[0, 6, 6, 0]} barSize={12}>
-                    <LabelList dataKey="pkb" position="right" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} offset={10} />
+                    <LabelList dataKey="pkb" position="right" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} offset={10} formatter={(v: number) => formatNumber(v)} />
                   </Bar>
                 </BarChart>
 
@@ -129,12 +157,21 @@ export function ChartsGrid() {
           <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={RAW_CITY_DATA} margin={{ top: 40, right: 20, left: 10, bottom: 10 }}>
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: '600', fill: '#94a3b8' }} dy={10} />
+                <BarChart data={data} margin={{ top: 40, right: 20, left: 10, bottom: 60 }}>
+                  <XAxis 
+                    dataKey="name" 
+                    interval={0} 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 9, fontWeight: '600', fill: '#94a3b8' }} 
+                    angle={-45}
+                    textAnchor="end"
+                    dy={10} 
+                  />
                   <YAxis hide />
                   <Tooltip cursor={{ fill: '#f8fafc' }} />
                   <Bar dataKey="tunggakan" fill={COLORS.danger} radius={[6, 6, 0, 0]} barSize={24} opacity={0.8}>
-                    <LabelList dataKey="tunggakan" position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#f43f5e' }} offset={10} />
+                    <LabelList dataKey="tunggakan" position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#f43f5e' }} offset={10} formatter={(v: number) => formatNumber(v)} />
                   </Bar>
                 </BarChart>
 
@@ -154,17 +191,26 @@ export function ChartsGrid() {
           <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={RAW_CITY_DATA} margin={{ top: 30, right: 20, left: 10, bottom: 10 }}>
+                <AreaChart data={data} margin={{ top: 30, right: 20, left: 10, bottom: 60 }}>
                   <defs>
                     <linearGradient id="colorAcc" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor={COLORS.warning} stopOpacity={0.1}/>
                       <stop offset="95%" stopColor={COLORS.warning} stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: '600', fill: '#94a3b8' }} dy={10} />
+                  <XAxis 
+                    dataKey="name" 
+                    interval={0} 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 9, fontWeight: '600', fill: '#94a3b8' }} 
+                    angle={-45}
+                    textAnchor="end"
+                    dy={10} 
+                  />
                   <Tooltip />
                   <Area type="monotone" dataKey="keterlambatan" stroke={COLORS.warning} fill="url(#colorAcc)" strokeWidth={4}>
-                    <LabelList dataKey="keterlambatan" position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#f59e0b' }} offset={10} />
+                    <LabelList dataKey="keterlambatan" position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#f59e0b' }} offset={10} formatter={(v: number) => formatNumber(v)} />
                   </Area>
                 </AreaChart>
 
@@ -215,6 +261,7 @@ export function ChartsGrid() {
                             <div className="space-y-1 text-slate-600">
                               <p>Impact: <span className="font-bold text-slate-900">{data.impact}%</span></p>
                               <p>Probabilitas: <span className="font-bold text-slate-900">{data.probability}%</span></p>
+                              <p>Tunggakan: <span className="font-bold text-rose-600">{formatNumber(data.tunggakan)} jt</span></p>
                             </div>
                           </div>
                         );
@@ -232,7 +279,7 @@ export function ChartsGrid() {
       </motion.div>
 
       {/* Peramalan (Forecasting) */}
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.7 }} className="md:col-span-2 lg:col-span-3">
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.7 }} className="lg:col-span-2">
         <Card className="border-slate-200/60 shadow-sm overflow-hidden relative">
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 to-transparent" />
           <CardHeader className="relative z-10 flex flex-row items-center justify-between">
@@ -245,7 +292,7 @@ export function ChartsGrid() {
           <CardContent className="relative z-10">
             <div className="h-72 mt-4">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={forecastData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <AreaChart data={forecastData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
                   <defs>
                     <linearGradient id="colorReal" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.15}/>
@@ -283,7 +330,7 @@ export function ChartsGrid() {
                     dot={{ r: 3, fill: '#4f46e5', strokeWidth: 2, stroke: '#fff' }}
                     connectNulls
                   >
-                    <LabelList dataKey="real" position="top" style={{ fontSize: '9px', fontWeight: 'bold', fill: '#4f46e5' }} offset={10} />
+                    <LabelList dataKey="real" position="top" style={{ fontSize: '9px', fontWeight: 'bold', fill: '#4f46e5' }} offset={10} formatter={(v: number) => formatNumber(v)} />
                   </Area>
                   <Area 
                     name="Proyeksi (Juta)"
@@ -296,7 +343,7 @@ export function ChartsGrid() {
                     dot={{ r: 3, fill: '#818cf8', strokeWidth: 2, stroke: '#fff' }}
                     connectNulls
                   >
-                    <LabelList dataKey="forecast" position="top" style={{ fontSize: '9px', fontWeight: 'bold', fill: '#818cf8' }} offset={10} />
+                    <LabelList dataKey="forecast" position="top" style={{ fontSize: '9px', fontWeight: 'bold', fill: '#818cf8' }} offset={10} formatter={(v: number) => formatNumber(v)} />
                   </Area>
 
                 </AreaChart>

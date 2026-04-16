@@ -21,7 +21,7 @@ import {
   Filter as FilterIcon
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { DetailedData } from "@/lib/data";
+import { DetailedData, formatNumber } from "@/lib/data";
 
 interface TransactionTableProps {
   data: DetailedData[];
@@ -78,7 +78,7 @@ export function TransactionTable({ data }: TransactionTableProps) {
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm font-bold text-slate-700">Rp {row.pokok.toLocaleString('id-ID')}</TableCell>
+                    <TableCell className="text-sm font-bold text-slate-700">Rp {formatNumber(row.pokok)}</TableCell>
                     <TableCell className="text-center">
                       <Badge 
                         variant="secondary"
