@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "convert-data": "node scripts/convert-csv.mjs",
-    "build": "node scripts/convert-csv.mjs && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
