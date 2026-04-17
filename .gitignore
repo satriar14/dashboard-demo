@@ -45,3 +45,6 @@ next-env.d.ts
 *.xlsx
 *.xls
 *.csv
+
+# Generated data file (from CSV conversion)
+data_kendaraan.json

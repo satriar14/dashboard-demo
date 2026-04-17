@@ -31,7 +31,8 @@ import {
   DetailedData,
   ArrearsByYear,
   ArrearsByLocation,
-  formatNumber
+  formatNumber,
+  formatCurrencyShort
 } from "@/lib/data";
 import { 
   getDashboardStats,
@@ -51,7 +52,9 @@ import {
   getGolonganOptions,
   getForecastData,
   getKecamatanForecastSeries,
-  getPaymentHeatmapData
+  getPaymentHeatmapData,
+  getBapendaSummary,
+  getJRSummary
 } from "@/lib/api-actions";
 
 export default function DashboardPage() {
@@ -86,6 +89,8 @@ export default function DashboardPage() {
   const [forecastData, setForecastData] = useState<any[]>([]);
   const [kecamatanForecastData, setKecamatanForecastData] = useState<any>(null);
   const [paymentHeatmapData, setPaymentHeatmapData] = useState<any[]>([]);
+  const [bapendaData, setBapendaData] = useState<any[]>([]);
+  const [jrData, setJRData] = useState<any[]>([]);
 
   // Initial fetch for Kabupaten and Jenis choices
   useEffect(() => {
@@ -146,7 +151,7 @@ export default function DashboardPage() {
         jenis: selectedJenis
       };
 
-      const [statsRes, cityRes, kabupatenRes, transRes, totalRes, arrearsYearRes, arrearsLocRes, heatmapDataRes, forecastRes, kecForecastRes, paymentHeatmapRes] = await Promise.all([
+      const [statsRes, cityRes, kabupatenRes, transRes, totalRes, arrearsYearRes, arrearsLocRes, heatmapDataRes, forecastRes, kecForecastRes, paymentHeatmapRes, bapendaRes, jrRes] = await Promise.all([
         getDashboardStats(filters),
         getCitySummary(filters),
         getKabupatenSummary(filters),
@@ -157,7 +162,9 @@ export default function DashboardPage() {
         getHeatmapData(filters),
         getForecastData(filters),
         getKecamatanForecastSeries(filters),
-        getPaymentHeatmapData(filters)
+        getPaymentHeatmapData(filters),
+        getBapendaSummary(filters),
+        getJRSummary(filters)
       ]);
 
       setStats(statsRes);
@@ -171,6 +178,8 @@ export default function DashboardPage() {
       setForecastData(forecastRes);
       setKecamatanForecastData(kecForecastRes);
       setPaymentHeatmapData(paymentHeatmapRes);
+      setBapendaData(bapendaRes);
+      setJRData(jrRes);
       setCurrentPage(page);
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
@@ -369,10 +378,10 @@ export default function DashboardPage() {
             </>
           ) : (
             <>
-              <KPICard title="Total Potensi" value={`Rp ${formatNumber(stats.totalPotensi)}jt`} trend={12} icon={DollarSign} iconColor="indigo" delay={0.1} />
-              <KPICard title="Total Tunggakan" value={`Rp ${formatNumber(stats.totalTunggakan)}jt`} trend={-4} icon={AlertCircle} iconColor="rose" delay={0.2} />
-              <KPICard title="Kepatuhan" value={`${stats.kepatuhan}%`} trend={2} icon={Activity} iconColor="emerald" delay={0.3} />
-              <KPICard title="Rata-rata Terlambat" value={`${formatNumber(stats.avgDelay)} Hari`} trend={-8} icon={Clock} iconColor="amber" delay={0.4} />
+              <KPICard title="Total Potensi" value={stats ? formatCurrencyShort(stats.totalPotensi) : "---"} trend={12} icon={DollarSign} iconColor="indigo" delay={0.1} />
+              <KPICard title="Total Tunggakan" value={stats ? formatCurrencyShort(stats.totalTunggakan) : "---"} trend={-4} icon={AlertCircle} iconColor="rose" delay={0.2} />
+              <KPICard title="Kepatuhan" value={stats ? `${formatNumber(parseFloat(stats.kepatuhan), 1)}%` : "---"} trend={2} icon={Activity} iconColor="emerald" delay={0.3} />
+              <KPICard title="Rata-rata Terlambat" value={stats ? `${formatNumber(stats.avgDelay)} Hari` : "---"} trend={-8} icon={Clock} iconColor="amber" delay={0.4} />
             </>
           )}
         </div>
@@ -408,6 +417,8 @@ export default function DashboardPage() {
               paymentHeatmapData={paymentHeatmapData}
               totalRows={totalTransactions}
               complianceData={stats.complianceDist}
+              bapendaData={bapendaData}
+              jrData={jrData}
             />
           )}
         </section>

@@ -7,7 +7,7 @@ import {
   LineChart, Line, LabelList, Legend
 } from 'recharts';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { MoreVertical, TrendingUp } from "lucide-react";
+import { MoreVertical, TrendingUp, Activity } from "lucide-react";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 
@@ -26,7 +26,9 @@ import {
   COLORS, 
   CHART_PALETTE, 
   COMPLIANCE_COLORS,
-  formatNumber
+  formatNumber,
+  formatNumberShort,
+  formatCurrencyShort
 } from "@/lib/data";
 
 interface ChartsGridProps {
@@ -40,9 +42,11 @@ interface ChartsGridProps {
   paymentHeatmapData: HeatmapPoint[];
   totalRows: number;
   complianceData: { name: string, value: number }[]; // New prop
+  bapendaData: { name: string, value: number }[];
+  jrData: { name: string, value: number }[];
 }
 
-export function ChartsGrid({ data, kabupatenData, arrearsByYearData, arrearsByLocationData, heatmapData, forecastData, kecamatanForecastData, paymentHeatmapData, totalRows, complianceData }: ChartsGridProps) {
+export function ChartsGrid({ data, kabupatenData, arrearsByYearData, arrearsByLocationData, heatmapData, forecastData, kecamatanForecastData, paymentHeatmapData, totalRows, complianceData, bapendaData, jrData }: ChartsGridProps) {
   const top10Data = useMemo(() => data.slice(0, 10), [data]);
   const top10KabupatenData = useMemo(() => kabupatenData ? kabupatenData.slice(0, 10) : [], [kabupatenData]);
   
@@ -114,7 +118,10 @@ export function ChartsGrid({ data, kabupatenData, arrearsByYearData, arrearsByLo
                   >
                     {complianceData.map((_, i) => <Cell key={i} fill={COMPLIANCE_COLORS[i % COMPLIANCE_COLORS.length]} stroke="none" />)}
                   </Pie>
-                  <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.08)', fontSize: '14px' }} />
+                  <Tooltip 
+                    formatter={(v: any) => formatNumber(Number(v))}
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.08)', fontSize: '14px' }} 
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -152,10 +159,14 @@ export function ChartsGrid({ data, kabupatenData, arrearsByYearData, arrearsByLo
                     dy={10} 
                   />
                   <YAxis hide />
-                  <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', fontSize: '14px' }} />
+                  <Tooltip 
+                    cursor={{ fill: '#f8fafc' }} 
+                    contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', fontSize: '14px' }}
+                    formatter={(v: any) => formatCurrencyShort(Number(v))}
+                  />
                   <Bar name="Pokok PKB" dataKey="pkb" stackId="a" fill={CHART_PALETTE[0]} barSize={24} />
                   <Bar name="Tunggakan" dataKey="tunggakan" stackId="a" fill={CHART_PALETTE[1]} radius={[4, 4, 0, 0]} barSize={24}>
-                    <LabelList dataKey="potensi" position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} offset={10} formatter={(v: any) => formatNumber(Number(v))} />
+                    <LabelList dataKey="potensi" position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} offset={10} formatter={(v: any) => formatNumberShort(Number(v))} />
                   </Bar>
                 </BarChart>
 
@@ -186,9 +197,12 @@ export function ChartsGrid({ data, kabupatenData, arrearsByYearData, arrearsByLo
                     tick={{ fontSize: 10, fontWeight: '600', fill: '#64748b' }} 
                     width={130} 
                   />
-                  <Tooltip formatter={(v: any) => formatNumber(Number(v))} contentStyle={{ borderRadius: '10px', border: 'none', fontSize: '14px' }} />
+                  <Tooltip 
+                    formatter={(v: any) => formatCurrencyShort(Number(v))} 
+                    contentStyle={{ borderRadius: '10px', border: 'none', fontSize: '14px' }} 
+                  />
                   <Bar dataKey="pkb" fill={COLORS.secondary} radius={[0, 6, 6, 0]} barSize={12}>
-                    <LabelList dataKey="pkb" position="right" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} offset={10} formatter={(v: any) => formatNumber(Number(v))} />
+                    <LabelList dataKey="pkb" position="right" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} offset={10} formatter={(v: any) => formatNumberShort(Number(v))} />
                   </Bar>
                 </BarChart>
 
@@ -219,7 +233,11 @@ export function ChartsGrid({ data, kabupatenData, arrearsByYearData, arrearsByLo
                     dy={10} 
                   />
                   <YAxis hide />
-                  <Tooltip cursor={{ fill: '#f8fafc' }} />
+                  <Tooltip 
+                    cursor={{ fill: '#f8fafc' }} 
+                    formatter={(v: any) => formatCurrencyShort(Number(v))}
+                    contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', fontSize: '14px' }}
+                  />
                   <Bar dataKey="tunggakan" fill={COLORS.danger} radius={[6, 6, 0, 0]} barSize={24} opacity={0.8}>
                     <LabelList dataKey="tunggakan" position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#f43f5e' }} offset={10} formatter={(v: any) => formatNumber(Number(v))} />
                   </Bar>
@@ -258,7 +276,10 @@ export function ChartsGrid({ data, kabupatenData, arrearsByYearData, arrearsByLo
                     textAnchor="end"
                     dy={10} 
                   />
-                  <Tooltip />
+                  <Tooltip 
+                    formatter={(v: any) => formatNumber(Number(v))}
+                    contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', fontSize: '14px' }}
+                  />
                   <Area type="monotone" dataKey="keterlambatan" stroke={COLORS.warning} fill="url(#colorAcc)" strokeWidth={4}>
                     <LabelList dataKey="keterlambatan" position="top" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#f59e0b' }} offset={10} formatter={(v: any) => formatNumber(Number(v))} />
                   </Area>
@@ -311,7 +332,7 @@ export function ChartsGrid({ data, kabupatenData, arrearsByYearData, arrearsByLo
                             <div className="space-y-1 text-slate-600">
                               <p>Impact: <span className="font-bold text-slate-900">{data.impact}%</span></p>
                               <p>Probabilitas: <span className="font-bold text-slate-900">{data.probability}%</span></p>
-                              <p>Tunggakan: <span className="font-bold text-rose-600">{formatNumber(data.tunggakan)} jt</span></p>
+                              <p>Tunggakan: <span className="font-bold text-rose-600">{formatCurrencyShort(data.tunggakan)}</span></p>
                             </div>
                           </div>
                         );
@@ -349,7 +370,7 @@ export function ChartsGrid({ data, kabupatenData, arrearsByYearData, arrearsByLo
                   <Tooltip 
                     cursor={{ fill: '#f8fafc' }} 
                     contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', fontSize: '14px' }}
-                    formatter={(v: any) => [`${v} Kendaraan`, 'Jumlah Tunggakan']}
+                    formatter={(v: any) => [`${formatNumber(Number(v))} Kendaraan`, 'Jumlah Tunggakan']}
                   />
                   <Bar 
                     dataKey="tunggak" 
@@ -362,6 +383,7 @@ export function ChartsGrid({ data, kabupatenData, arrearsByYearData, arrearsByLo
                       position="top" 
                       style={{ fontSize: '10px', fontWeight: 'bold', fill: '#4f46e5' }} 
                       offset={10} 
+                      formatter={(v: any) => formatNumber(Number(v))}
                     />
                   </Bar>
                 </BarChart>
@@ -395,7 +417,7 @@ export function ChartsGrid({ data, kabupatenData, arrearsByYearData, arrearsByLo
                   <Tooltip 
                     cursor={{ fill: '#f8fafc' }} 
                     contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', fontSize: '14px' }}
-                    formatter={(v: any) => [`${v} Kendaraan`, 'Jumlah Tunggakan']}
+                    formatter={(v: any) => [`${formatNumber(Number(v))} Kendaraan`, 'Jumlah Tunggakan']}
                   />
                   <Bar 
                     dataKey="jumlah_kendaraan" 
@@ -409,6 +431,7 @@ export function ChartsGrid({ data, kabupatenData, arrearsByYearData, arrearsByLo
                       position="right" 
                       style={{ fontSize: '9px', fontWeight: 'bold', fill: '#f43f5e' }} 
                       offset={10} 
+                      formatter={(v: any) => formatNumber(Number(v))}
                     />
                   </Bar>
                 </BarChart>
@@ -419,7 +442,90 @@ export function ChartsGrid({ data, kabupatenData, arrearsByYearData, arrearsByLo
         </Card>
       </motion.div>
 
-      {/* Peramalan (Forecasting) */}
+        {/* NEW CHARTS: Potensi Bapenda & JR */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }} className="lg:col-span-2">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="overflow-hidden border-none shadow-2xl bg-white/80 backdrop-blur-xl">
+              <CardHeader className="pb-2 border-b border-slate-50">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">KONTRIBUSI POTENSI BAPENDA</CardTitle>
+                    <p className="text-[10px] text-slate-400 mt-1 uppercase">Potensi PKB & BBNKB per Kabupaten/Kota</p>
+                  </div>
+                  <div className="p-2 bg-indigo-50 rounded-xl">
+                    <TrendingUp className="w-5 h-5 text-indigo-600" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="h-80 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={bapendaData} layout="vertical" margin={{ left: 30, right: 30 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                      <XAxis type="number" hide />
+                      <YAxis 
+                        dataKey="name" 
+                        type="category" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 10, fontWeight: '600', fill: '#64748b' }} 
+                        width={130} 
+                      />
+                      <Tooltip 
+                        formatter={(v: any) => formatCurrencyShort(Number(v))} 
+                        contentStyle={{ borderRadius: '10px', border: 'none', fontSize: '14px' }} 
+                      />
+                      <Bar dataKey="value" fill="#6366f1" radius={[0, 6, 6, 0]} barSize={12}>
+                        <LabelList dataKey="value" position="right" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} offset={10} formatter={(v: any) => formatNumberShort(Number(v))} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="overflow-hidden border-none shadow-2xl bg-white/80 backdrop-blur-xl">
+              <CardHeader className="pb-2 border-b border-slate-50">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">POTENSI SWDKLLJ (JR)</CardTitle>
+                    <p className="text-[10px] text-slate-400 mt-1 uppercase">Potensi Jasa Raharja per Kabupaten/Kota</p>
+                  </div>
+                  <div className="p-2 bg-emerald-50 rounded-xl">
+                    <Activity className="w-5 h-5 text-emerald-600" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="h-80 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={jrData} layout="vertical" margin={{ left: 30, right: 30 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                      <XAxis type="number" hide />
+                      <YAxis 
+                        dataKey="name" 
+                        type="category" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 10, fontWeight: '600', fill: '#64748b' }} 
+                        width={130} 
+                      />
+                      <Tooltip 
+                        formatter={(v: any) => formatCurrencyShort(Number(v))} 
+                        contentStyle={{ borderRadius: '10px', border: 'none', fontSize: '14px' }} 
+                      />
+                      <Bar dataKey="value" fill="#10b981" radius={[0, 6, 6, 0]} barSize={12}>
+                        <LabelList dataKey="value" position="right" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} offset={10} formatter={(v: any) => formatNumberShort(Number(v))} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </motion.div>
+
+        {/* Peramalan (Forecasting) */}
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.7 }} className="lg:col-span-2">
         <Card className="border-slate-200/60 shadow-sm overflow-hidden relative">
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 to-transparent" />
@@ -460,6 +566,7 @@ export function ChartsGrid({ data, kabupatenData, arrearsByYearData, arrearsByLo
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#fff', border: 'none', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }}
                     itemStyle={{ fontSize: '12px' }}
+                    formatter={(v: any) => formatCurrencyShort(Number(v))}
                   />
                   <Area 
                     name="Data Real (Juta)"
@@ -545,6 +652,7 @@ export function ChartsGrid({ data, kabupatenData, arrearsByYearData, arrearsByLo
                     <Tooltip 
                       contentStyle={{ backgroundColor: '#fff', border: 'none', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }}
                       itemStyle={{ fontSize: '11px', fontWeight: '600' }}
+                      formatter={(v: any) => formatCurrencyShort(Number(v))}
                     />
                     <Legend 
                         verticalAlign="top" 
@@ -573,7 +681,7 @@ export function ChartsGrid({ data, kabupatenData, arrearsByYearData, arrearsByLo
         </motion.div>
       )}
 
-    </div>
+      </div>
   );
 }
 

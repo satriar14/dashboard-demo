@@ -1,5 +1,28 @@
-export const formatNumber = (num: number) => {
-  return new Intl.NumberFormat('en-US').format(num);
+export const formatNumber = (num: number, decimals: number = 0) => {
+  return new Intl.NumberFormat('id-ID', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(num);
+};
+
+export const formatCurrencyShort = (numInMillions: number) => {
+  if (numInMillions >= 1000000) {
+    return `Rp ${formatNumber(numInMillions / 1000000, 2)} T`;
+  }
+  if (numInMillions >= 1000) {
+    return `Rp ${formatNumber(numInMillions / 1000, 2)} M`;
+  }
+  return `Rp ${formatNumber(numInMillions, 1)} Juta`;
+};
+
+export const formatNumberShort = (numInMillions: number) => {
+  if (numInMillions >= 1000000) {
+    return `${formatNumber(numInMillions / 1000000, 2)} T`;
+  }
+  if (numInMillions >= 1000) {
+    return `${formatNumber(numInMillions / 1000, 2)} M`;
+  }
+  return `${formatNumber(numInMillions, 1)} Jt`;
 };
 
 export type CityData = {

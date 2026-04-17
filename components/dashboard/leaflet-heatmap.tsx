@@ -7,7 +7,7 @@ import 'leaflet/dist/leaflet.css';
 // @ts-ignore
 import 'leaflet.heat';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { CityData, formatNumber, HeatmapPoint } from "@/lib/data";
+import { CityData, formatNumber, formatCurrencyShort, HeatmapPoint } from "@/lib/data";
 
 const fixLeafletIcon = () => {
   // @ts-ignore
@@ -189,9 +189,9 @@ export default function LeafletHeatmap({
                   <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-tighter leading-none">{colorScheme === 'payments' ? 'Kantor SAMSAT' : 'Kecamatan'}</span>
                   <span className="text-sm font-black text-slate-800 leading-none">{marker.name}</span>
                   <div className="w-full h-[1px] bg-slate-100 my-1" />
-                  <span className={`text-xs font-black ${accentColor} leading-none`}>Rp {formatNumber(marker.value)}{metricUnit}</span>
+                  <span className={`text-xs font-black ${accentColor} leading-none`}>{formatCurrencyShort(marker.value)}</span>
                   {marker.count && (
-                    <span className={`text-[10px] font-bold ${accentColor} opacity-75 mt-0.5 leading-none`}>{formatNumber(marker.count)} Unit Kendaraan</span>
+                    <span className={`text-[10px] font-bold ${accentColor} opacity-75 mt-0.5 leading-none`}>{formatNumber(marker.count)} Unit</span>
                   )}
                 </div>
               </Tooltip>
@@ -204,7 +204,7 @@ export default function LeafletHeatmap({
                     <div className={`${accentBg} p-3 rounded-xl space-y-2`}>
                       <div>
                         <p className={`text-[10px] font-bold ${valueColor} uppercase tracking-wider mb-1 opacity-70`}>{metricLabel}</p>
-                        <p className={`text-xl font-black ${valueColor}`}>Rp {formatNumber(marker.value)}{metricUnit}</p>
+                        <p className={`text-xl font-black ${valueColor}`}>{formatCurrencyShort(marker.value)}</p>
                       </div>
                       {marker.count && (
                         <div className="pt-2 mt-2 border-t border-emerald-200/50">

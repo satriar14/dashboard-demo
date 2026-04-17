@@ -1,8 +1,15 @@
 "use server";
 
 import { CityData, DetailedData, ArrearsByYear, ArrearsByLocation, HeatmapPoint } from "./data";
-import { getDashboardData } from "./dashboard-data";
 import { getCoords } from "./coordinates";
+import { pool } from "./db";
+import { 
+  getFilterClause, 
+  SQL_NUMERIC_CAST, 
+  SQL_TOTAL_DENDA,
+  SQL_POTENSI_BAPENDA,
+  SQL_POTENSI_JR
+} from "./sql-utils";
 
 export type DashboardFilters = {
   city: string;
@@ -16,72 +23,34 @@ export type DashboardFilters = {
   jenis: string;
 };
 
-function applyFilters(data: DetailedData[], filters: DashboardFilters) {
-  const filtered = data.filter(item => {
-    // City Filter
-    if (filters.city !== 'Semua' && item.kabupaten !== filters.city) return false;
-
-    // Kecamatan Filter
-    if (filters.kecamatan && filters.kecamatan !== 'Semua' && item.kecamatan !== filters.kecamatan) return false;
-
-    // Desa Filter
-    if (filters.desa && filters.desa !== 'Semua' && item.desa_kelurahan !== filters.desa) return false;
-
-    // Jenis Filter
-    if (filters.jenis && filters.jenis !== 'Semua' && item.jenis_kendaraan !== filters.jenis) return false;
-
-    // Date Filters (based on date property)
-    if (item.date) {
-      const dateObj = new Date(item.date);
-      const year = dateObj.getFullYear().toString();
-      const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
-      const day = dateObj.getDate().toString();
-
-      if (filters.year !== 'Semua' && year !== filters.year) return false;
-      if (filters.month !== 'Semua' && month !== filters.month) return false;
-      if (filters.day !== 'Semua' && day !== filters.day) return false;
-    } else if (filters.year !== 'Semua' || filters.month !== 'Semua' || filters.day !== 'Semua') {
-      return false;
-    }
-
-    // Golongan (warna_plat) Filter
-    if (filters.golongan !== 'Semua' && item.warna_plat !== filters.golongan) return false;
-
-    // Search Filter
-    if (filters.search) {
-      const search = filters.search.toLowerCase();
-      const match = 
-        item.nopol.toLowerCase().includes(search) || 
-        item.pemilik.toLowerCase().includes(search) || 
-        (item.samsat || '').toLowerCase().includes(search);
-      if (!match) return false;
-    }
-
-    return true;
-  });
-
-  return filtered;
-}
-
 export async function getDashboardStats(filters: DashboardFilters) {
-  const data = await getDashboardData();
-  const filtered = applyFilters(data, filters);
+  const { text: filterClause, values } = getFilterClause(filters);
+  const now = new Date().toISOString();
 
-  const totalPotensiVal = filtered.reduce((acc, curr) => acc + (curr.pokok + (curr.opsen || 0)), 0);
-  const totalTunggakanVal = filtered.reduce((acc, curr) => acc + (curr.denda || 0), 0);
+  const query = `
+    SELECT 
+      SUM(${SQL_NUMERIC_CAST('pokok_pkb')} + ${SQL_NUMERIC_CAST('opsen_pokok_pkb')}) as total_potensi_val,
+      SUM(${SQL_TOTAL_DENDA}) as total_tunggakan_val,
+      AVG(
+        CASE 
+          WHEN ${SQL_TOTAL_DENDA} > 0 AND masa_pajak_sampai IS NOT NULL AND TO_DATE(masa_pajak_sampai, 'YYYY-MM-DD') < $${values.length + 1}::date
+          THEN ($${values.length + 1}::date - TO_DATE(masa_pajak_sampai, 'YYYY-MM-DD'))
+          ELSE NULL 
+        END
+      ) as avg_delay_val,
+      COUNT(CASE WHEN ${SQL_TOTAL_DENDA} = 0 THEN 1 END) as sangat_patuh,
+      COUNT(CASE WHEN ${SQL_TOTAL_DENDA} > 0 AND (masa_pajak_sampai IS NULL OR ($${values.length + 1}::date - TO_DATE(masa_pajak_sampai, 'YYYY-MM-DD')) < 30) THEN 1 END) as kurang_patuh,
+      COUNT(CASE WHEN ${SQL_TOTAL_DENDA} > 0 AND masa_pajak_sampai IS NOT NULL AND ($${values.length + 1}::date - TO_DATE(masa_pajak_sampai, 'YYYY-MM-DD')) >= 30 THEN 1 END) as tidak_patuh
+    FROM data_kendaraan_pajak
+    ${filterClause}
+  `;
+
+  const { rows } = await pool.query(query, [...values, now]);
+  const row = rows[0];
+
+  const totalPotensiVal = parseFloat(row.total_potensi_val || 0);
+  const totalTunggakanVal = parseFloat(row.total_tunggakan_val || 0);
   
-  // Calculate average delay
-  const lateItems = filtered.filter(item => item.denda > 0 && item.masa_pajak_sampai);
-  const now = new Date();
-  let totalDelay = 0;
-  lateItems.forEach(item => {
-    const due = new Date(item.masa_pajak_sampai!);
-    if (due < now) {
-      totalDelay += Math.floor((now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
-    }
-  });
-  const avgDelay = lateItems.length > 0 ? Math.round(totalDelay / lateItems.length) : 0;
-
   const totalPotensi = totalPotensiVal / 1000000;
   const totalTunggakan = totalTunggakanVal / 1000000;
   
@@ -89,272 +58,288 @@ export async function getDashboardStats(filters: DashboardFilters) {
     ? (((totalPotensiVal - totalTunggakanVal) / totalPotensiVal) * 100).toFixed(1) 
     : "0";
 
-  const complianceDist = [
-    { name: "Sangat Patuh", value: filtered.filter(item => item.denda === 0).length },
-    { name: "Kurang Patuh", value: filtered.filter(item => item.denda > 0 && (!item.masa_pajak_sampai || (now.getTime() - new Date(item.masa_pajak_sampai).getTime()) < 30 * 24 * 60 * 60 * 1000)).length },
-    { name: "Tidak Patuh", value: filtered.filter(item => item.denda > 0 && item.masa_pajak_sampai && (now.getTime() - new Date(item.masa_pajak_sampai).getTime()) >= 30 * 24 * 60 * 60 * 1000).length }
-  ];
-
   return {
     totalPotensi,
     totalTunggakan,
-    avgDelay,
+    avgDelay: Math.round(parseFloat(row.avg_delay_val || 0)),
     kepatuhan,
-    complianceDist
+    complianceDist: [
+      { name: "Sangat Patuh", value: parseInt(row.sangat_patuh || 0) },
+      { name: "Kurang Patuh", value: parseInt(row.kurang_patuh || 0) },
+      { name: "Tidak Patuh", value: parseInt(row.tidak_patuh || 0) }
+    ]
   };
 }
 
 export async function getCitySummary(filters: DashboardFilters): Promise<CityData[]> {
-  const data = await getDashboardData();
-  const filtered = applyFilters(data, filters);
+  const { text: filterClause, values } = getFilterClause(filters);
+  const now = new Date().toISOString();
 
-  const summaryMap: Record<string, CityData> = {};
+  // Group by kecamatan for city summary
+  const query = `
+    SELECT 
+      COALESCE(nama_kec, nama_kabkota, 'N/A') as group_name,
+      SUM(${SQL_NUMERIC_CAST('pokok_pkb')} / 1000000) as pkb,
+      SUM(${SQL_TOTAL_DENDA} / 1000000) as tunggakan,
+      SUM((${SQL_NUMERIC_CAST('pokok_pkb')} + ${SQL_NUMERIC_CAST('opsen_pokok_pkb')}) / 1000000) as potensi,
+      AVG(
+        CASE 
+          WHEN ${SQL_TOTAL_DENDA} > 0 AND masa_pajak_sampai IS NOT NULL AND TO_DATE(masa_pajak_sampai, 'YYYY-MM-DD') < $${values.length + 1}::date
+          THEN ($${values.length + 1}::date - TO_DATE(masa_pajak_sampai, 'YYYY-MM-DD'))
+          ELSE NULL 
+        END
+      ) as avg_delay
+    FROM data_kendaraan_pajak
+    ${filterClause}
+    GROUP BY group_name
+    ORDER BY potensi DESC
+  `;
 
-  filtered.forEach(item => {
-    // Group by kecamatan instead of kabupaten
-    const groupName = item.kecamatan || item.kabupaten || 'N/A';
-    if (!summaryMap[groupName]) {
-      summaryMap[groupName] = {
-        name: groupName,
-        pkb: 0,
-        tunggakan: 0,
-        potensi: 0,
-        keterlambatan: 0,
-        golongan: "All"
-      };
-    }
-    
-    summaryMap[groupName].pkb += (item.pokok / 1000000);
-    summaryMap[groupName].tunggakan += (item.denda / 1000000);
-    summaryMap[groupName].potensi += ((item.pokok + (item.opsen || 0)) / 1000000);
-    
-    // For delay, we average it later
-    const due = item.masa_pajak_sampai ? new Date(item.masa_pajak_sampai) : null;
-    if (due && due < new Date() && item.denda > 0) {
-      summaryMap[groupName].keterlambatan += Math.floor((new Date().getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
-    }
-  });
+  const { rows } = await pool.query(query, [...values, now]);
 
-  // Calculate actual averages for delay
-  const result = Object.values(summaryMap);
-  result.forEach(group => {
-    const groupItems = filtered.filter(it => (it.kecamatan || it.kabupaten) === group.name && it.denda > 0);
-    if (groupItems.length > 0) {
-      group.keterlambatan = Math.round(group.keterlambatan / groupItems.length);
-    }
-  });
-
-  return result.sort((a, b) => b.potensi - a.potensi);
+  return rows.map(row => ({
+    name: row.group_name,
+    pkb: parseFloat(row.pkb || 0),
+    tunggakan: parseFloat(row.tunggakan || 0),
+    potensi: parseFloat(row.potensi || 0),
+    keterlambatan: Math.round(parseFloat(row.avg_delay || 0)),
+    golongan: "All"
+  }));
 }
 
 export async function getKabupatenSummary(filters: DashboardFilters): Promise<CityData[]> {
-  const data = await getDashboardData();
-  const filtered = applyFilters(data, filters);
+  const { text: filterClause, values } = getFilterClause(filters);
 
-  const summaryMap: Record<string, CityData> = {};
+  const query = `
+    SELECT 
+      COALESCE(nama_kabkota, 'N/A') as group_name,
+      SUM(${SQL_NUMERIC_CAST('pokok_pkb')} / 1000000) as pkb,
+      SUM(${SQL_TOTAL_DENDA} / 1000000) as tunggakan,
+      SUM((${SQL_NUMERIC_CAST('pokok_pkb')} + ${SQL_NUMERIC_CAST('opsen_pokok_pkb')}) / 1000000) as potensi
+    FROM data_kendaraan_pajak
+    ${filterClause}
+    GROUP BY group_name
+    ORDER BY potensi DESC
+  `;
 
-  filtered.forEach(item => {
-    const groupName = item.kabupaten || 'N/A';
-    if (!summaryMap[groupName]) {
-      summaryMap[groupName] = {
-        name: groupName,
-        pkb: 0,
-        tunggakan: 0,
-        potensi: 0,
-        keterlambatan: 0,
-        golongan: "All"
-      };
-    }
-    
-    summaryMap[groupName].pkb += (item.pokok / 1000000);
-    summaryMap[groupName].tunggakan += (item.denda / 1000000);
-    summaryMap[groupName].potensi += ((item.pokok + (item.opsen || 0)) / 1000000);
-  });
+  const { rows } = await pool.query(query, values);
 
-  return Object.values(summaryMap).sort((a, b) => b.potensi - a.potensi);
+  return rows.map(row => ({
+    name: row.group_name,
+    pkb: parseFloat(row.pkb || 0),
+    tunggakan: parseFloat(row.tunggakan || 0),
+    potensi: parseFloat(row.potensi || 0),
+    keterlambatan: 0,
+    golongan: "All"
+  }));
 }
 
 export async function getTransactions(filters: DashboardFilters, page: number = 1): Promise<DetailedData[]> {
-  const data = await getDashboardData();
-  const filtered = applyFilters(data, filters);
-
+  const { text: filterClause, values } = getFilterClause(filters);
   const limit = 20;
   const offset = (page - 1) * limit;
 
-  // Sorting by date desc
-  const sorted = filtered.sort((a, b) => {
-    const dateA = a.date ? new Date(a.date).getTime() : 0;
-    const dateB = b.date ? new Date(b.date).getTime() : 0;
-    return dateB - dateA;
-  });
+  const query = `
+    SELECT 
+      nomor_polisi, upt_nama, paid_on, masa_pajak_sampai,
+      ${SQL_NUMERIC_CAST('pokok_pkb')} as pokok,
+      ${SQL_TOTAL_DENDA} as denda,
+      ${SQL_NUMERIC_CAST('opsen_pokok_pkb')} as opsen,
+      nama_pemilik, alamat, jenis_kendaraan, merk_kendaraan, tipe_kendaraan,
+      tahun_buat, bbm, warna_plat, nomor_mesin, nomor_rangka, nik, no_hp,
+      nama_kabkota, nama_kec, nama_kel,
+      pokok_bbnkb, opsen_pokok_bbnkb, pokok_swdkllj, denda_swdkllj
+    FROM data_kendaraan_pajak
+    ${filterClause}
+    ORDER BY COALESCE(paid_on, masa_pajak_sampai) DESC NULLS LAST
+    LIMIT $${values.length + 1} OFFSET $${values.length + 2}
+  `;
 
-  return sorted.slice(offset, offset + limit);
+  const { rows } = await pool.query(query, [...values, limit, offset]);
+
+  return rows.map((row, i) => ({
+    id: (row.nomor_polisi || 'ID') + '-' + (offset + i),
+    samsat: row.upt_nama || row.nama_kabkota || 'N/A',
+    nopol: row.nomor_polisi || '',
+    pemilik: row.nama_pemilik || '',
+    alamat: row.alamat || '',
+    pokok: parseFloat(row.pokok || 0),
+    denda: parseFloat(row.denda || 0),
+    opsen: parseFloat(row.opsen || 0),
+    status: parseFloat(row.denda || 0) > 0 ? 'Tertunggak' : 'Lunas',
+    date: row.paid_on || row.masa_pajak_sampai || '',
+
+    // Detail Kendaraan
+    merek: row.merk_kendaraan || '',
+    tipe: row.tipe_kendaraan || '',
+    tahun_buat: row.tahun_buat || '',
+    bahan_bakar: row.bbm || '',
+    jenis_kendaraan: row.jenis_kendaraan || '',
+    warna_plat: row.warna_plat || '',
+    nomor_mesin: row.nomor_mesin || '',
+    nomor_rangka: row.nomor_rangka || '',
+    nik: row.nik || '',
+    no_hp: row.no_hp || '',
+
+    // Detail Pajak
+    bbnkb: parseFloat(row.pokok_bbnkb || 0),
+    opsen_bbnkb: parseFloat(row.opsen_pokok_bbnkb || 0),
+    swdkllj: parseFloat(row.pokok_swdkllj || 0),
+    denda_swdkllj: parseFloat(row.denda_swdkllj || 0),
+
+    // Detail Alamat
+    kecamatan: row.nama_kec || '',
+    desa_kelurahan: row.nama_kel || '',
+    kabupaten: row.nama_kabkota || 'N/A',
+    masa_pajak_sampai: row.masa_pajak_sampai || '',
+  }));
 }
 
 export async function getTotalTransactions(filters: DashboardFilters): Promise<number> {
-  const data = await getDashboardData();
-  const filtered = applyFilters(data, filters);
-  return filtered.length;
+  const { text: filterClause, values } = getFilterClause(filters);
+  const query = `SELECT COUNT(*) FROM data_kendaraan_pajak ${filterClause}`;
+  const { rows } = await pool.query(query, values);
+  return parseInt(rows[0].count);
 }
 
 export async function getKabupatenOptions() {
-  const data = await getDashboardData();
-  const unique = Array.from(new Set(data.map(item => item.kabupaten).filter(Boolean)));
-  return unique.sort() as string[];
+  const query = `SELECT DISTINCT nama_kabkota FROM data_kendaraan_pajak WHERE nama_kabkota IS NOT NULL ORDER BY nama_kabkota`;
+  const { rows } = await pool.query(query);
+  return rows.map(r => r.nama_kabkota);
 }
 
 export async function getKecamatanOptions(kabupaten: string) {
   if (!kabupaten || kabupaten === 'Semua') return [];
-  const data = await getDashboardData();
-  const unique = Array.from(new Set(
-    data.filter(item => item.kabupaten === kabupaten)
-        .map(item => item.kecamatan)
-        .filter(Boolean)
-  ));
-  return unique.sort() as string[];
+  const query = `SELECT DISTINCT nama_kec FROM data_kendaraan_pajak WHERE nama_kabkota = $1 AND nama_kec IS NOT NULL ORDER BY nama_kec`;
+  const { rows } = await pool.query(query, [kabupaten]);
+  return rows.map(r => r.nama_kec);
 }
 
 export async function getDesaOptions(kecamatan: string) {
   if (!kecamatan || kecamatan === 'Semua') return [];
-  const data = await getDashboardData();
-  const unique = Array.from(new Set(
-    data.filter(item => item.kecamatan === kecamatan)
-        .map(item => item.desa_kelurahan)
-        .filter(Boolean)
-  ));
-  return unique.sort() as string[];
+  const query = `SELECT DISTINCT nama_kel FROM data_kendaraan_pajak WHERE nama_kec = $1 AND nama_kel IS NOT NULL ORDER BY nama_kel`;
+  const { rows } = await pool.query(query, [kecamatan]);
+  return rows.map(r => r.nama_kel);
 }
 
 export async function getJenisKendaraanOptions() {
-  const data = await getDashboardData();
-  const unique = Array.from(new Set(data.map(item => item.jenis_kendaraan).filter(Boolean)));
-  return unique.sort() as string[];
+  const query = `SELECT DISTINCT jenis_kendaraan FROM data_kendaraan_pajak WHERE jenis_kendaraan IS NOT NULL ORDER BY jenis_kendaraan`;
+  const { rows } = await pool.query(query);
+  return rows.map(r => r.jenis_kendaraan);
 }
 
 export async function getYearOptions() {
-  const data = await getDashboardData();
-  const years = data.map(item => {
-    if (!item.date) return null;
-    return new Date(item.date).getFullYear().toString();
-  }).filter(Boolean);
-  
-  const unique = Array.from(new Set(years));
-  return unique.sort((a, b) => Number(b) - Number(a)) as string[];
+  const query = `
+    SELECT DISTINCT LEFT(COALESCE(paid_on, masa_pajak_sampai), 4) as year 
+    FROM data_kendaraan_pajak 
+    WHERE COALESCE(paid_on, masa_pajak_sampai) IS NOT NULL 
+    ORDER BY year DESC
+  `;
+  const { rows } = await pool.query(query);
+  return rows.map(r => r.year);
 }
 
 export async function getGolonganOptions() {
-  const data = await getDashboardData();
-  const unique = Array.from(new Set(
-    data.map(item => item.warna_plat)
-        .filter(Boolean)
-        .filter(v => v !== '1' && v !== '2' && v !== '')
-  ));
-  return unique.sort() as string[];
+  const query = `SELECT DISTINCT warna_plat FROM data_kendaraan_pajak WHERE warna_plat IS NOT NULL AND warna_plat != '' ORDER BY warna_plat`;
+  const { rows } = await pool.query(query);
+  return rows.map(r => r.warna_plat);
 }
 
 export async function getArrearsByProdYear(filters: DashboardFilters): Promise<ArrearsByYear[]> {
-  const data = await getDashboardData();
-  const filtered = applyFilters(data, filters);
+  const { text: filterClause, values } = getFilterClause(filters);
   
-  const arrearsMap: Record<string, number> = {};
+  const query = `
+    SELECT 
+      tahun_buat,
+      COUNT(*) as tunggak
+    FROM data_kendaraan_pajak
+    ${filterClause} ${filterClause ? 'AND' : 'WHERE'} ${SQL_TOTAL_DENDA} > 0 AND tahun_buat IS NOT NULL
+    GROUP BY tahun_buat
+    ORDER BY tahun_buat DESC
+  `;
 
-  filtered.forEach(item => {
-    const isArrears = item.denda > 0 || (item.denda_swdkllj && item.denda_swdkllj > 0 && (item.nopol || '').length < 6);
-    if (isArrears && item.tahun_buat) {
-      arrearsMap[item.tahun_buat] = (arrearsMap[item.tahun_buat] || 0) + 1;
-    }
-  });
+  const { rows } = await pool.query(query, values);
 
-  return Object.entries(arrearsMap).map(([year, count]) => ({
-    tahun_buat: year,
-    tunggak: count
-  })).sort((a, b) => Number(b.tahun_buat) - Number(a.tahun_buat));
+  return rows.map(row => ({
+    tahun_buat: row.tahun_buat,
+    tunggak: parseInt(row.tunggak)
+  }));
 }
 
 export async function getArrearsByLocation(filters: DashboardFilters): Promise<ArrearsByLocation[]> {
-  const data = await getDashboardData();
-  const filtered = applyFilters(data, filters);
+  const { text: filterClause, values } = getFilterClause(filters);
   
-  // Pivot to kecamatan by default for more detail
-  let groupKey: 'kabupaten' | 'kecamatan' | 'desa_kelurahan' = 'kecamatan';
-  
-  if (filters.city !== 'Semua') {
-    if (filters.kecamatan !== 'Semua') {
-      groupKey = 'desa_kelurahan';
-    }
+  // Pivot logic
+  let groupCol = 'nama_kec';
+  if (filters.city !== 'Semua' && filters.kecamatan !== 'Semua') {
+    groupCol = 'nama_kel';
   }
 
-  const map: Record<string, number> = {};
+  const query = `
+    SELECT 
+      COALESCE(${groupCol}, 'TIDAK TERIDENTIFIKASI') as group_name,
+      COUNT(*) as jumlah_kendaraan
+    FROM data_kendaraan_pajak
+    ${filterClause} ${filterClause ? 'AND' : 'WHERE'} ${SQL_TOTAL_DENDA} > 0
+    GROUP BY group_name
+    ORDER BY jumlah_kendaraan DESC
+    LIMIT 10
+  `;
 
-  filtered.forEach(item => {
-    const isArrears = item.denda > 0 || (item.denda_swdkllj && item.denda_swdkllj > 0);
-    if (isArrears) {
-      // Fallback to kabupaten if kecamatan is missing
-      const name = item[groupKey] || item['kecamatan'] || item['kabupaten'] || 'TIDAK TERIDENTIFIKASI';
-      map[name] = (map[name] || 0) + 1;
-    }
-  });
+  const { rows } = await pool.query(query, values);
 
-  return Object.entries(map).map(([name, count]) => ({
-    name,
-    jumlah_kendaraan: count
-  })).sort((a, b) => b.jumlah_kendaraan - a.jumlah_kendaraan).slice(0, 10);
+  return rows.map(row => ({
+    name: row.group_name,
+    jumlah_kendaraan: parseInt(row.jumlah_kendaraan)
+  }));
 }
 
 export async function getHeatmapData(filters: DashboardFilters): Promise<HeatmapPoint[]> {
-  const data = await getDashboardData();
-  const filtered = applyFilters(data, filters);
-  
-  // Always group by Kecamatan to provide the "detail" requested
-  const groupKey = 'kecamatan';
-  const parentKey = 'kabupaten';
+  const { text: filterClause, values } = getFilterClause(filters);
 
-  const map: Record<string, { value: number, parent?: string }> = {};
+  const query = `
+    SELECT 
+      COALESCE(nama_kec, 'TIDAK TERIDENTIFIKASI') as group_name,
+      nama_kabkota as parent_name,
+      SUM(${SQL_TOTAL_DENDA} / 1000000) as total_value
+    FROM data_kendaraan_pajak
+    ${filterClause} ${filterClause ? 'AND' : 'WHERE'} ${SQL_TOTAL_DENDA} > 0
+    GROUP BY group_name, parent_name
+  `;
 
-  filtered.forEach(item => {
-    const isArrears = item.denda > 0 || (item.denda_swdkllj && item.denda_swdkllj > 0);
-    if (isArrears) {
-      const name = item[groupKey] || item[parentKey] || 'TIDAK TERIDENTIFIKASI';
-      if (!map[name]) {
-        map[name] = { value: 0, parent: item[parentKey] };
-      }
-      map[name].value += (item.denda / 1000000); // in millions
-    }
-  });
+  const { rows } = await pool.query(query, values);
 
-  return Object.entries(map).map(([name, info]) => {
-    // Attempt to get coordinates for the specific name (kecamatan)
-    // Fallback to parent (kabupaten) coords if kecamatan not found
-    const coords = getCoords(name, info.parent);
+  return rows.map(row => {
+    const coords = getCoords(row.group_name, row.parent_name);
     return {
-      name: name,
+      name: row.group_name,
       lat: coords.lat,
       lng: coords.lng,
-      value: info.value
+      value: parseFloat(row.total_value || 0)
     };
   });
 }
 
 export async function getForecastData(filters: DashboardFilters) {
-  const data = await getDashboardData();
-  const filtered = applyFilters(data, filters);
-  
-  const monthMap: Record<string, number> = {};
-  
-  filtered.forEach(item => {
-    if (item.date) {
-      const d = new Date(item.date);
-      const monthKey = d.toLocaleString('en-US', { month: 'short', year: '2-digit' });
-      const sortKey = d.getFullYear() * 100 + d.getMonth();
-      
-      const compositeKey = `${sortKey}|${monthKey}`;
-      monthMap[compositeKey] = (monthMap[compositeKey] || 0) + (item.pokok / 1000000);
-    }
-  });
+  const { text: filterClause, values } = getFilterClause(filters);
 
-  const sortedMonths = Object.keys(monthMap).sort().map(k => {
-    const [sort, name] = k.split('|');
-    return { name, value: monthMap[k], sort: parseInt(sort) };
+  const query = `
+    SELECT 
+      LEFT(COALESCE(paid_on, masa_pajak_sampai), 7) as month_key,
+      SUM(${SQL_NUMERIC_CAST('pokok_pkb')} / 1000000) as total_val
+    FROM data_kendaraan_pajak
+    ${filterClause} ${filterClause ? 'AND' : 'WHERE'} COALESCE(paid_on, masa_pajak_sampai) IS NOT NULL
+    GROUP BY LEFT(COALESCE(paid_on, masa_pajak_sampai), 7)
+    ORDER BY month_key ASC
+  `;
+
+  const { rows } = await pool.query(query, values);
+
+  const sortedMonths = rows.map(row => {
+    const [year, month] = row.month_key.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+    const name = date.toLocaleString('en-US', { month: 'short', year: '2-digit' });
+    return { name, value: parseFloat(row.total_val || 0), sort: parseInt(year) * 100 + parseInt(month) };
   });
 
   if (sortedMonths.length === 0) return [];
@@ -387,7 +372,7 @@ export async function getForecastData(filters: DashboardFilters) {
     const projectedValue = m * (lastIndex + i) + c;
     const lastYear = Math.floor(lastSort / 100);
     const lastMonth = lastSort % 100;
-    const projDate = new Date(lastYear, lastMonth + i, 1);
+    const projDate = new Date(lastYear, lastMonth + i - 1, 1);
     const projName = projDate.toLocaleString('en-US', { month: 'short', year: '2-digit' });
     
     result.push({
@@ -401,27 +386,32 @@ export async function getForecastData(filters: DashboardFilters) {
 }
 
 export async function getKecamatanForecastSeries(filters: DashboardFilters) {
-  const data = await getDashboardData();
-  const filtered = applyFilters(data, filters);
-  
-  const kecamatanList = Array.from(new Set(filtered.map(it => it.kecamatan).filter(Boolean))).sort() as string[];
-  
-  const pivot: Record<string, Record<string, number>> = {};
-  
-  filtered.forEach(item => {
-    if (item.date && item.kecamatan) {
-      const d = new Date(item.date);
-      const monthKey = d.toLocaleString('en-US', { month: 'short', year: '2-digit' });
-      const sortKey = d.getFullYear() * 100 + d.getMonth();
-      const compositeMonthKey = `${sortKey}|${monthKey}`;
-      
-      if (!pivot[compositeMonthKey]) pivot[compositeMonthKey] = {};
-      pivot[compositeMonthKey][item.kecamatan!] = (pivot[compositeMonthKey][item.kecamatan!] || 0) + (item.pokok / 1000000);
-    }
-  });
+  const { text: filterClause, values } = getFilterClause(filters);
 
-  const sortedMonthKeys = Object.keys(pivot).sort();
+  // Get aggregated data by month and kecamatan
+  const query = `
+    SELECT 
+      LEFT(COALESCE(paid_on, masa_pajak_sampai), 7) as month_key,
+      nama_kec as kecamatan,
+      SUM(${SQL_NUMERIC_CAST('pokok_pkb')} / 1000000) as total_val
+    FROM data_kendaraan_pajak
+    ${filterClause} ${filterClause ? 'AND' : 'WHERE'} COALESCE(paid_on, masa_pajak_sampai) IS NOT NULL AND nama_kec IS NOT NULL
+    GROUP BY LEFT(COALESCE(paid_on, masa_pajak_sampai), 7), nama_kec
+    ORDER BY month_key ASC
+  `;
+
+  const { rows } = await pool.query(query, values);
+  
+  const kecamatanList = Array.from(new Set(rows.map(r => r.kecamatan))).sort() as string[];
+  const sortedMonthKeys = Array.from(new Set(rows.map(r => r.month_key))).sort();
+  
   if (sortedMonthKeys.length === 0) return { data: [], kecamatanList: [] };
+
+  const pivot: Record<string, Record<string, number>> = {};
+  rows.forEach(row => {
+    if (!pivot[row.month_key]) pivot[row.month_key] = {};
+    pivot[row.month_key][row.kecamatan] = parseFloat(row.total_val || 0);
+  });
 
   const forecasts: Record<string, { m: number, c: number, n: number }> = {};
   
@@ -442,7 +432,9 @@ export async function getKecamatanForecastSeries(filters: DashboardFilters) {
   });
 
   const result: any[] = sortedMonthKeys.map((k, index) => {
-    const [_, monthName] = k.split('|');
+    const [year, month] = k.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+    const monthName = date.toLocaleString('en-US', { month: 'short', year: '2-digit' });
     const entry: any = { x: monthName, isForecast: false };
     kecamatanList.forEach(kec => {
       entry[kec] = Math.round((pivot[k][kec] || 0) * 1000) / 1000;
@@ -451,12 +443,12 @@ export async function getKecamatanForecastSeries(filters: DashboardFilters) {
   });
 
   const lastIndex = sortedMonthKeys.length - 1;
-  const lastSortKey = parseInt(sortedMonthKeys[lastIndex].split('|')[0]);
-  const lastYear = Math.floor(lastSortKey / 100);
-  const lastMonth = lastSortKey % 100;
+  const lastMonthKey = sortedMonthKeys[lastIndex];
+  const lastYear = parseInt(lastMonthKey.split('-')[0]);
+  const lastMonth = parseInt(lastMonthKey.split('-')[1]);
 
   for (let i = 1; i <= 3; i++) {
-    const projDate = new Date(lastYear, lastMonth + i, 1);
+    const projDate = new Date(lastYear, lastMonth + i - 1, 1);
     const projMonthName = projDate.toLocaleString('en-US', { month: 'short', year: '2-digit' });
     const entry: any = { x: projMonthName, isForecast: true };
     
@@ -475,28 +467,58 @@ export async function getKecamatanForecastSeries(filters: DashboardFilters) {
 }
 
 export async function getPaymentHeatmapData(filters: DashboardFilters): Promise<HeatmapPoint[]> {
-  const data = await getDashboardData();
-  const filtered = applyFilters(data, filters);
+  const { text: filterClause, values } = getFilterClause(filters);
 
-  const map: Record<string, { count: number; totalPkb: number; uptNama: string }> = {};
+  const query = `
+    SELECT 
+      COALESCE(upt_nama, nama_kabkota, 'TIDAK DIKETAHUI') as group_name,
+      COUNT(*) as count,
+      SUM(${SQL_NUMERIC_CAST('pokok_pkb')} / 1000000) as total_pkb
+    FROM data_kendaraan_pajak
+    ${filterClause}
+    GROUP BY group_name
+    HAVING SUM(${SQL_NUMERIC_CAST('pokok_pkb')}) > 0
+  `;
 
-  filtered.forEach(item => {
-    const uptKey = (item.samsat || item.kabupaten || 'TIDAK DIKETAHUI').toUpperCase();
-    if (!map[uptKey]) {
-      map[uptKey] = { count: 0, totalPkb: 0, uptNama: item.samsat || item.kabupaten || uptKey };
-    }
-    map[uptKey].count += 1;
-    map[uptKey].totalPkb += item.pokok / 1000000;
-  });
+  const { rows } = await pool.query(query, values);
 
-  return Object.entries(map).map(([key, info]) => {
-    const coords = getCoords(info.uptNama);
+  return rows.map(row => {
+    const coords = getCoords(row.group_name);
     return {
-      name: info.uptNama,
+      name: row.group_name,
       lat: coords.lat,
       lng: coords.lng,
-      value: Math.round(info.totalPkb * 100) / 100,
-      count: info.count
+      value: Math.round(parseFloat(row.total_pkb || 0) * 100) / 100,
+      count: parseInt(row.count)
     };
-  }).filter(p => p.value > 0);
+  });
+}
+export async function getBapendaSummary(filters: DashboardFilters) {
+  const { text: filterClause, values } = getFilterClause(filters);
+  const query = `
+    SELECT 
+      nama_kabkota as name,
+      SUM(${SQL_POTENSI_BAPENDA} / 1000000) as value
+    FROM data_kendaraan_pajak
+    ${filterClause}
+    GROUP BY name
+    ORDER BY value DESC
+  `;
+  const { rows } = await pool.query(query, values);
+  return rows.map(r => ({ name: r.name, value: parseFloat(r.value || 0) }));
+}
+
+export async function getJRSummary(filters: DashboardFilters) {
+  const { text: filterClause, values } = getFilterClause(filters);
+  const query = `
+    SELECT 
+      nama_kabkota as name,
+      SUM(${SQL_POTENSI_JR} / 1000000) as value
+    FROM data_kendaraan_pajak
+    ${filterClause}
+    GROUP BY name
+    ORDER BY value DESC
+  `;
+  const { rows } = await pool.query(query, values);
+  return rows.map(r => ({ name: r.name, value: parseFloat(r.value || 0) }));
 }
