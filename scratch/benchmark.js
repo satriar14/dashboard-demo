@@ -7,7 +7,7 @@ async function benchmark() {
 
   try {
     console.time('Full Fetch (approx)');
-    const resAll = await pool.query('SELECT * FROM data_kendaraan_pajak LIMIT 10000'); // only 10k for test
+    const resAll = await pool.query('SELECT * FROM data_kendaraan_pajak_new LIMIT 10000'); // only 10k for test
     console.timeEnd('Full Fetch (approx)');
 
     console.time('SQL Aggregation (Stats)');
@@ -24,7 +24,7 @@ async function benchmark() {
           COALESCE(NULLIF(denda_swdkllj, '')::numeric, 0) +
           COALESCE(NULLIF(tunggakan_denda_swdkllj, '')::numeric, 0)
         ) as total_denda
-      FROM data_kendaraan_pajak
+      FROM data_kendaraan_pajak_new
     `);
     console.timeEnd('SQL Aggregation (Stats)');
     console.log('Stats Result:', resStats.rows[0]);

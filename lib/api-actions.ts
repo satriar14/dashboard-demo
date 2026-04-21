@@ -27,27 +27,37 @@ export async function getDashboardStats(filters: DashboardFilters) {
   const { text: filterClause, values } = getFilterClause(filters);
   const now = new Date().toISOString();
 
-  const query = `
+  const statsQuery = `
     SELECT 
       SUM(${SQL_NUMERIC_CAST('pokok_pkb')} + ${SQL_NUMERIC_CAST('opsen_pokok_pkb')}) as total_potensi_val,
       SUM(${SQL_TOTAL_DENDA}) as total_tunggakan_val,
       AVG(
         CASE 
-          WHEN ${SQL_TOTAL_DENDA} > 0 AND masa_pajak_sampai IS NOT NULL AND TO_DATE(masa_pajak_sampai, 'YYYY-MM-DD') < $${values.length + 1}::date
-          THEN ($${values.length + 1}::date - TO_DATE(masa_pajak_sampai, 'YYYY-MM-DD'))
+          WHEN ${SQL_TOTAL_DENDA} > 0 AND masa_pajak_sampai IS NOT NULL AND masa_pajak_sampai::date < $${values.length + 1}::date
+          THEN ($${values.length + 1}::date - masa_pajak_sampai::date)
           ELSE NULL 
         END
-      ) as avg_delay_val,
-      COUNT(CASE WHEN ${SQL_TOTAL_DENDA} = 0 THEN 1 END) as sangat_patuh,
-      COUNT(CASE WHEN ${SQL_TOTAL_DENDA} > 0 AND (masa_pajak_sampai IS NULL OR ($${values.length + 1}::date - TO_DATE(masa_pajak_sampai, 'YYYY-MM-DD')) < 30) THEN 1 END) as kurang_patuh,
-      COUNT(CASE WHEN ${SQL_TOTAL_DENDA} > 0 AND masa_pajak_sampai IS NOT NULL AND ($${values.length + 1}::date - TO_DATE(masa_pajak_sampai, 'YYYY-MM-DD')) >= 30 THEN 1 END) as tidak_patuh
-    FROM data_kendaraan_pajak
+      ) as avg_delay_val
+    FROM v_data_transaksi_kendaraan
     ${filterClause}
   `;
 
-  const { rows } = await pool.query(query, [...values, now]);
-  const row = rows[0];
+  const labelsQuery = `
+    SELECT 
+      COALESCE(customer_labelling, 'Unlabelled') as name,
+      COUNT(*)::int as value
+    FROM v_data_transaksi_kendaraan
+    ${filterClause}
+    GROUP BY name
+    ORDER BY value DESC
+  `;
 
+  const [{ rows: statsRows }, { rows: labelRows }] = await Promise.all([
+    pool.query(statsQuery, [...values, now]),
+    pool.query(labelsQuery, values)
+  ]);
+
+  const row = statsRows[0];
   const totalPotensiVal = parseFloat(row.total_potensi_val || 0);
   const totalTunggakanVal = parseFloat(row.total_tunggakan_val || 0);
   
@@ -63,11 +73,7 @@ export async function getDashboardStats(filters: DashboardFilters) {
     totalTunggakan,
     avgDelay: Math.round(parseFloat(row.avg_delay_val || 0)),
     kepatuhan,
-    complianceDist: [
-      { name: "Sangat Patuh", value: parseInt(row.sangat_patuh || 0) },
-      { name: "Kurang Patuh", value: parseInt(row.kurang_patuh || 0) },
-      { name: "Tidak Patuh", value: parseInt(row.tidak_patuh || 0) }
-    ]
+    complianceDist: labelRows
   };
 }
 
@@ -84,12 +90,12 @@ export async function getCitySummary(filters: DashboardFilters): Promise<CityDat
       SUM((${SQL_NUMERIC_CAST('pokok_pkb')} + ${SQL_NUMERIC_CAST('opsen_pokok_pkb')}) / 1000000) as potensi,
       AVG(
         CASE 
-          WHEN ${SQL_TOTAL_DENDA} > 0 AND masa_pajak_sampai IS NOT NULL AND TO_DATE(masa_pajak_sampai, 'YYYY-MM-DD') < $${values.length + 1}::date
-          THEN ($${values.length + 1}::date - TO_DATE(masa_pajak_sampai, 'YYYY-MM-DD'))
+          WHEN ${SQL_TOTAL_DENDA} > 0 AND masa_pajak_sampai IS NOT NULL AND masa_pajak_sampai::date < $${values.length + 1}::date
+          THEN ($${values.length + 1}::date - masa_pajak_sampai::date)
           ELSE NULL 
         END
       ) as avg_delay
-    FROM data_kendaraan_pajak
+    FROM v_data_transaksi_kendaraan
     ${filterClause}
     GROUP BY group_name
     ORDER BY potensi DESC
@@ -116,7 +122,7 @@ export async function getKabupatenSummary(filters: DashboardFilters): Promise<Ci
       SUM(${SQL_NUMERIC_CAST('pokok_pkb')} / 1000000) as pkb,
       SUM(${SQL_TOTAL_DENDA} / 1000000) as tunggakan,
       SUM((${SQL_NUMERIC_CAST('pokok_pkb')} + ${SQL_NUMERIC_CAST('opsen_pokok_pkb')}) / 1000000) as potensi
-    FROM data_kendaraan_pajak
+    FROM v_data_transaksi_kendaraan
     ${filterClause}
     GROUP BY group_name
     ORDER BY potensi DESC
@@ -141,98 +147,109 @@ export async function getTransactions(filters: DashboardFilters, page: number = 
 
   const query = `
     SELECT 
-      nomor_polisi, upt_nama, paid_on, masa_pajak_sampai,
+      nopol, nomor_polisi, upt_nama, paid_on, masa_pajak_sampai,
       ${SQL_NUMERIC_CAST('pokok_pkb')} as pokok,
       ${SQL_TOTAL_DENDA} as denda,
       ${SQL_NUMERIC_CAST('opsen_pokok_pkb')} as opsen,
-      nama_pemilik, alamat, jenis_kendaraan, merk_kendaraan, tipe_kendaraan,
+      nama_pemilik, jenis_kendaraan, merk_kendaraan, tipe_kendaraan, cc, fungsi,
       tahun_buat, bbm, warna_plat, nomor_mesin, nomor_rangka, nik, no_hp,
       nama_kabkota, nama_kec, nama_kel,
-      pokok_bbnkb, opsen_pokok_bbnkb, pokok_swdkllj, denda_swdkllj
-    FROM data_kendaraan_pajak
+      pokok_bbnkb, opsen_pokok_bbnkb, pokok_swdkllj, denda_swdkllj,
+      ai_reminder, customer_labelling, next_best_action
+    FROM v_data_transaksi_kendaraan
     ${filterClause}
-    ORDER BY COALESCE(paid_on, masa_pajak_sampai) DESC NULLS LAST
+    ORDER BY COALESCE(paid_on::text, masa_pajak_sampai::text) DESC NULLS LAST
     LIMIT $${values.length + 1} OFFSET $${values.length + 2}
   `;
 
   const { rows } = await pool.query(query, [...values, limit, offset]);
 
-  return rows.map((row, i) => ({
-    id: (row.nomor_polisi || 'ID') + '-' + (offset + i),
-    samsat: row.upt_nama || row.nama_kabkota || 'N/A',
-    nopol: row.nomor_polisi || '',
-    pemilik: row.nama_pemilik || '',
-    alamat: row.alamat || '',
-    pokok: parseFloat(row.pokok || 0),
-    denda: parseFloat(row.denda || 0),
-    opsen: parseFloat(row.opsen || 0),
-    status: parseFloat(row.denda || 0) > 0 ? 'Tertunggak' : 'Lunas',
-    date: row.paid_on || row.masa_pajak_sampai || '',
+  return rows.map((row, i) => {
+    const nopol = row.nopol || row.nomor_polisi || '';
+    return {
+      id: (nopol || 'ID') + '-' + (offset + i),
+      samsat: row.upt_nama || row.nama_kabkota || 'N/A',
+      nopol,
+      pemilik: row.nama_pemilik || '',
+      alamat: '',  // tidak ada kolom alamat di v_data_transaksi_kendaraan
+      pokok: parseFloat(row.pokok || 0),
+      denda: parseFloat(row.denda || 0),
+      opsen: parseFloat(row.opsen || 0),
+      status: parseFloat(row.denda || 0) > 0 ? 'Tertunggak' : 'Lunas',
+      date: row.paid_on || row.masa_pajak_sampai || '',
 
-    // Detail Kendaraan
-    merek: row.merk_kendaraan || '',
-    tipe: row.tipe_kendaraan || '',
-    tahun_buat: row.tahun_buat || '',
-    bahan_bakar: row.bbm || '',
-    jenis_kendaraan: row.jenis_kendaraan || '',
-    warna_plat: row.warna_plat || '',
-    nomor_mesin: row.nomor_mesin || '',
-    nomor_rangka: row.nomor_rangka || '',
-    nik: row.nik || '',
-    no_hp: row.no_hp || '',
+      // Detail Kendaraan
+      merek: row.merk_kendaraan || '',
+      tipe: row.tipe_kendaraan || '',
+      tahun_buat: row.tahun_buat || '',
+      bahan_bakar: row.bbm || '',
+      jenis_kendaraan: row.jenis_kendaraan || '',
+      warna_plat: row.warna_plat || '',
+      nomor_mesin: row.nomor_mesin || '',
+      nomor_rangka: row.nomor_rangka || '',
+      nik: row.nik || '',
+      no_hp: row.no_hp || '',
+      cc: row.cc || '',
+      fungsi: row.fungsi || '',
 
-    // Detail Pajak
-    bbnkb: parseFloat(row.pokok_bbnkb || 0),
-    opsen_bbnkb: parseFloat(row.opsen_pokok_bbnkb || 0),
-    swdkllj: parseFloat(row.pokok_swdkllj || 0),
-    denda_swdkllj: parseFloat(row.denda_swdkllj || 0),
+      // Detail Pajak
+      bbnkb: parseFloat(row.pokok_bbnkb || 0),
+      opsen_bbnkb: parseFloat(row.opsen_pokok_bbnkb || 0),
+      swdkllj: parseFloat(row.pokok_swdkllj || 0),
+      denda_swdkllj: parseFloat(row.denda_swdkllj || 0),
 
-    // Detail Alamat
-    kecamatan: row.nama_kec || '',
-    desa_kelurahan: row.nama_kel || '',
-    kabupaten: row.nama_kabkota || 'N/A',
-    masa_pajak_sampai: row.masa_pajak_sampai || '',
-  }));
+      // Detail Alamat
+      kecamatan: row.nama_kec || '',
+      desa_kelurahan: row.nama_kel || '',
+      kabupaten: row.nama_kabkota || 'N/A',
+      masa_pajak_sampai: row.masa_pajak_sampai || '',
+
+      // AI Fields
+      ai_reminder: row.ai_reminder || '',
+      customer_labelling: row.customer_labelling || '',
+      next_best_action: row.next_best_action || '',
+    };
+  });
 }
 
 export async function getTotalTransactions(filters: DashboardFilters): Promise<number> {
   const { text: filterClause, values } = getFilterClause(filters);
-  const query = `SELECT COUNT(*) FROM data_kendaraan_pajak ${filterClause}`;
+  const query = `SELECT COUNT(*) FROM v_data_transaksi_kendaraan ${filterClause}`;
   const { rows } = await pool.query(query, values);
   return parseInt(rows[0].count);
 }
 
 export async function getKabupatenOptions() {
-  const query = `SELECT DISTINCT nama_kabkota FROM data_kendaraan_pajak WHERE nama_kabkota IS NOT NULL ORDER BY nama_kabkota`;
+  const query = `SELECT DISTINCT nama_kabkota FROM v_data_transaksi_kendaraan WHERE nama_kabkota IS NOT NULL ORDER BY nama_kabkota`;
   const { rows } = await pool.query(query);
   return rows.map(r => r.nama_kabkota);
 }
 
 export async function getKecamatanOptions(kabupaten: string) {
   if (!kabupaten || kabupaten === 'Semua') return [];
-  const query = `SELECT DISTINCT nama_kec FROM data_kendaraan_pajak WHERE nama_kabkota = $1 AND nama_kec IS NOT NULL ORDER BY nama_kec`;
+  const query = `SELECT DISTINCT nama_kec FROM v_data_transaksi_kendaraan WHERE nama_kabkota = $1 AND nama_kec IS NOT NULL ORDER BY nama_kec`;
   const { rows } = await pool.query(query, [kabupaten]);
   return rows.map(r => r.nama_kec);
 }
 
 export async function getDesaOptions(kecamatan: string) {
   if (!kecamatan || kecamatan === 'Semua') return [];
-  const query = `SELECT DISTINCT nama_kel FROM data_kendaraan_pajak WHERE nama_kec = $1 AND nama_kel IS NOT NULL ORDER BY nama_kel`;
+  const query = `SELECT DISTINCT nama_kel FROM v_data_transaksi_kendaraan WHERE nama_kec = $1 AND nama_kel IS NOT NULL ORDER BY nama_kel`;
   const { rows } = await pool.query(query, [kecamatan]);
   return rows.map(r => r.nama_kel);
 }
 
 export async function getJenisKendaraanOptions() {
-  const query = `SELECT DISTINCT jenis_kendaraan FROM data_kendaraan_pajak WHERE jenis_kendaraan IS NOT NULL ORDER BY jenis_kendaraan`;
+  const query = `SELECT DISTINCT jenis_kendaraan FROM v_data_transaksi_kendaraan WHERE jenis_kendaraan IS NOT NULL ORDER BY jenis_kendaraan`;
   const { rows } = await pool.query(query);
   return rows.map(r => r.jenis_kendaraan);
 }
 
 export async function getYearOptions() {
   const query = `
-    SELECT DISTINCT LEFT(COALESCE(paid_on, masa_pajak_sampai), 4) as year 
-    FROM data_kendaraan_pajak 
-    WHERE COALESCE(paid_on, masa_pajak_sampai) IS NOT NULL 
+    SELECT DISTINCT LEFT(COALESCE(paid_on::text, masa_pajak_sampai::text), 4) as year 
+    FROM v_data_transaksi_kendaraan 
+    WHERE COALESCE(paid_on::text, masa_pajak_sampai::text) IS NOT NULL 
     ORDER BY year DESC
   `;
   const { rows } = await pool.query(query);
@@ -240,7 +257,7 @@ export async function getYearOptions() {
 }
 
 export async function getGolonganOptions() {
-  const query = `SELECT DISTINCT warna_plat FROM data_kendaraan_pajak WHERE warna_plat IS NOT NULL AND warna_plat != '' ORDER BY warna_plat`;
+  const query = `SELECT DISTINCT warna_plat FROM v_data_transaksi_kendaraan WHERE warna_plat IS NOT NULL AND warna_plat != '' ORDER BY warna_plat`;
   const { rows } = await pool.query(query);
   return rows.map(r => r.warna_plat);
 }
@@ -252,7 +269,7 @@ export async function getArrearsByProdYear(filters: DashboardFilters): Promise<A
     SELECT 
       tahun_buat,
       COUNT(*) as tunggak
-    FROM data_kendaraan_pajak
+    FROM v_data_transaksi_kendaraan
     ${filterClause} ${filterClause ? 'AND' : 'WHERE'} ${SQL_TOTAL_DENDA} > 0 AND tahun_buat IS NOT NULL
     GROUP BY tahun_buat
     ORDER BY tahun_buat DESC
@@ -279,7 +296,7 @@ export async function getArrearsByLocation(filters: DashboardFilters): Promise<A
     SELECT 
       COALESCE(${groupCol}, 'TIDAK TERIDENTIFIKASI') as group_name,
       COUNT(*) as jumlah_kendaraan
-    FROM data_kendaraan_pajak
+    FROM v_data_transaksi_kendaraan
     ${filterClause} ${filterClause ? 'AND' : 'WHERE'} ${SQL_TOTAL_DENDA} > 0
     GROUP BY group_name
     ORDER BY jumlah_kendaraan DESC
@@ -302,7 +319,7 @@ export async function getHeatmapData(filters: DashboardFilters): Promise<Heatmap
       COALESCE(nama_kec, 'TIDAK TERIDENTIFIKASI') as group_name,
       nama_kabkota as parent_name,
       SUM(${SQL_TOTAL_DENDA} / 1000000) as total_value
-    FROM data_kendaraan_pajak
+    FROM v_data_transaksi_kendaraan
     ${filterClause} ${filterClause ? 'AND' : 'WHERE'} ${SQL_TOTAL_DENDA} > 0
     GROUP BY group_name, parent_name
   `;
@@ -325,11 +342,11 @@ export async function getForecastData(filters: DashboardFilters) {
 
   const query = `
     SELECT 
-      LEFT(COALESCE(paid_on, masa_pajak_sampai), 7) as month_key,
+      LEFT(COALESCE(paid_on::text, masa_pajak_sampai::text), 7) as month_key,
       SUM(${SQL_NUMERIC_CAST('pokok_pkb')} / 1000000) as total_val
-    FROM data_kendaraan_pajak
-    ${filterClause} ${filterClause ? 'AND' : 'WHERE'} COALESCE(paid_on, masa_pajak_sampai) IS NOT NULL
-    GROUP BY LEFT(COALESCE(paid_on, masa_pajak_sampai), 7)
+    FROM v_data_transaksi_kendaraan
+    ${filterClause} ${filterClause ? 'AND' : 'WHERE'} COALESCE(paid_on::text, masa_pajak_sampai::text) IS NOT NULL
+    GROUP BY LEFT(COALESCE(paid_on::text, masa_pajak_sampai::text), 7)
     ORDER BY month_key ASC
   `;
 
@@ -391,12 +408,12 @@ export async function getKecamatanForecastSeries(filters: DashboardFilters) {
   // Get aggregated data by month and kecamatan
   const query = `
     SELECT 
-      LEFT(COALESCE(paid_on, masa_pajak_sampai), 7) as month_key,
+      LEFT(COALESCE(paid_on::text, masa_pajak_sampai::text), 7) as month_key,
       nama_kec as kecamatan,
       SUM(${SQL_NUMERIC_CAST('pokok_pkb')} / 1000000) as total_val
-    FROM data_kendaraan_pajak
-    ${filterClause} ${filterClause ? 'AND' : 'WHERE'} COALESCE(paid_on, masa_pajak_sampai) IS NOT NULL AND nama_kec IS NOT NULL
-    GROUP BY LEFT(COALESCE(paid_on, masa_pajak_sampai), 7), nama_kec
+    FROM v_data_transaksi_kendaraan
+    ${filterClause} ${filterClause ? 'AND' : 'WHERE'} COALESCE(paid_on::text, masa_pajak_sampai::text) IS NOT NULL AND nama_kec IS NOT NULL
+    GROUP BY LEFT(COALESCE(paid_on::text, masa_pajak_sampai::text), 7), nama_kec
     ORDER BY month_key ASC
   `;
 
@@ -474,7 +491,7 @@ export async function getPaymentHeatmapData(filters: DashboardFilters): Promise<
       COALESCE(upt_nama, nama_kabkota, 'TIDAK DIKETAHUI') as group_name,
       COUNT(*) as count,
       SUM(${SQL_NUMERIC_CAST('pokok_pkb')} / 1000000) as total_pkb
-    FROM data_kendaraan_pajak
+    FROM v_data_transaksi_kendaraan
     ${filterClause}
     GROUP BY group_name
     HAVING SUM(${SQL_NUMERIC_CAST('pokok_pkb')}) > 0
@@ -499,10 +516,11 @@ export async function getBapendaSummary(filters: DashboardFilters) {
     SELECT 
       nama_kabkota as name,
       SUM(${SQL_POTENSI_BAPENDA} / 1000000) as value
-    FROM data_kendaraan_pajak
+    FROM v_data_transaksi_kendaraan
     ${filterClause}
     GROUP BY name
     ORDER BY value DESC
+    LIMIT 10
   `;
   const { rows } = await pool.query(query, values);
   return rows.map(r => ({ name: r.name, value: parseFloat(r.value || 0) }));
@@ -514,10 +532,11 @@ export async function getJRSummary(filters: DashboardFilters) {
     SELECT 
       nama_kabkota as name,
       SUM(${SQL_POTENSI_JR} / 1000000) as value
-    FROM data_kendaraan_pajak
+    FROM v_data_transaksi_kendaraan
     ${filterClause}
     GROUP BY name
     ORDER BY value DESC
+    LIMIT 10
   `;
   const { rows } = await pool.query(query, values);
   return rows.map(r => ({ name: r.name, value: parseFloat(r.value || 0) }));

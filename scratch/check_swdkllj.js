@@ -9,7 +9,7 @@ async function checkTunggakanSwdkllj() {
     const res = await pool.query(`
       SELECT 
         pokok_swdkllj, tunggakan_pokok_swdkllj, denda_swdkllj, tunggakan_denda_swdkllj
-      FROM data_kendaraan_pajak
+      FROM data_kendaraan_pajak_new
       WHERE tunggakan_pokok_swdkllj != '0' OR tunggakan_denda_swdkllj != '0'
       LIMIT 10
     `);

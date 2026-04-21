@@ -3,12 +3,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { 
   Search, 
-  Filter as FilterIcon, 
   Download, 
   Activity, 
-  DollarSign, 
-  AlertCircle, 
-  Clock,
   LayoutDashboard,
   Loader2
 } from 'lucide-react';
@@ -17,44 +13,18 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
-import { KPICard } from "@/components/dashboard/kpi-card";
+import { KpiStatsContainer } from "@/components/dashboard/kpi-stats-container";
 import { ChartsGrid } from "@/components/dashboard/charts-grid";
-import { TransactionTable } from "@/components/dashboard/transaction-table";
-import {
-  KPICardSkeleton,
-  ChartCardSkeleton,
-  HeatmapSkeleton,
-  TableSkeleton
-} from "@/components/dashboard/skeleton-loader";
+import { TransactionsContainer } from "@/components/dashboard/transactions-container";
+
 import { 
-  CityData,
-  DetailedData,
-  ArrearsByYear,
-  ArrearsByLocation,
-  formatNumber,
-  formatCurrencyShort
-} from "@/lib/data";
-import { 
-  getDashboardStats,
-  getCitySummary,
-  getKabupatenSummary,
-  getTransactions,
-  getTotalTransactions,
-  getArrearsByProdYear,
-  getArrearsByLocation,
-  getHeatmapData,
-  DashboardFilters,
   getKabupatenOptions,
   getKecamatanOptions,
   getDesaOptions,
   getJenisKendaraanOptions,
   getYearOptions,
   getGolonganOptions,
-  getForecastData,
-  getKecamatanForecastSeries,
-  getPaymentHeatmapData,
-  getBapendaSummary,
-  getJRSummary
+  DashboardFilters
 } from "@/lib/api-actions";
 
 export default function DashboardPage() {
@@ -76,23 +46,9 @@ export default function DashboardPage() {
   const [yearOptions, setYearOptions] = useState<string[]>([]);
   const [golonganOptions, setGolonganOptions] = useState<string[]>([]);
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [stats, setStats] = useState<any>(null);
-  const [filteredCityData, setFilteredCityData] = useState<CityData[]>([]);
-  const [filteredKabupatenData, setFilteredKabupatenData] = useState<CityData[]>([]);
-  const [filteredDetailedData, setFilteredDetailedData] = useState<DetailedData[]>([]);
-  const [arrearsByYearData, setArrearsByYearData] = useState<ArrearsByYear[]>([]);
-  const [arrearsByLocationData, setArrearsByLocationData] = useState<ArrearsByLocation[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalTransactions, setTotalTransactions] = useState(0);
-  const [heatmapData, setHeatmapData] = useState<any[]>([]);
-  const [forecastData, setForecastData] = useState<any[]>([]);
-  const [kecamatanForecastData, setKecamatanForecastData] = useState<any>(null);
-  const [paymentHeatmapData, setPaymentHeatmapData] = useState<any[]>([]);
-  const [bapendaData, setBapendaData] = useState<any[]>([]);
-  const [jrData, setJRData] = useState<any[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Initial fetch for Kabupaten and Jenis choices
+  // Initial fetch for options
   useEffect(() => {
     getKabupatenOptions().then(setKabupatenOptions);
     getJenisKendaraanOptions().then(setJenisOptions);
@@ -100,7 +56,7 @@ export default function DashboardPage() {
     getGolonganOptions().then(setGolonganOptions);
   }, []);
 
-  // Fetch Kecamatan when Kabupaten changes
+  // Cascading filters logic
   useEffect(() => {
     if (selectedCity !== 'Semua') {
       getKecamatanOptions(selectedCity).then(setKecamatanOptions);
@@ -111,7 +67,6 @@ export default function DashboardPage() {
     setSelectedDesa('Semua');
   }, [selectedCity]);
 
-  // Fetch Desa when Kecamatan changes
   useEffect(() => {
     if (selectedKecamatan !== 'Semua') {
       getDesaOptions(selectedKecamatan).then(setDesaOptions);
@@ -136,65 +91,24 @@ export default function DashboardPage() {
     { value: "12", label: "Desember" },
   ];
 
-  const fetchAllData = async (page = 1) => {
-    setIsLoading(true);
-    try {
-      const filters: DashboardFilters = {
-        city: selectedCity,
-        year: selectedYear,
-        month: selectedMonth,
-        day: selectedDay,
-        golongan: selectedGolongan,
-        search: searchQuery,
-        kecamatan: selectedKecamatan,
-        desa: selectedDesa,
-        jenis: selectedJenis
-      };
+  const currentFilters: DashboardFilters = useMemo(() => ({
+    city: selectedCity,
+    year: selectedYear,
+    month: selectedMonth,
+    day: selectedDay,
+    golongan: selectedGolongan,
+    search: searchQuery,
+    kecamatan: selectedKecamatan,
+    desa: selectedDesa,
+    jenis: selectedJenis
+  }), [selectedCity, selectedYear, selectedMonth, selectedDay, selectedGolongan, searchQuery, selectedKecamatan, selectedDesa, selectedJenis]);
 
-      const [statsRes, cityRes, kabupatenRes, transRes, totalRes, arrearsYearRes, arrearsLocRes, heatmapDataRes, forecastRes, kecForecastRes, paymentHeatmapRes, bapendaRes, jrRes] = await Promise.all([
-        getDashboardStats(filters),
-        getCitySummary(filters),
-        getKabupatenSummary(filters),
-        getTransactions(filters, page),
-        getTotalTransactions(filters),
-        getArrearsByProdYear(filters),
-        getArrearsByLocation(filters),
-        getHeatmapData(filters),
-        getForecastData(filters),
-        getKecamatanForecastSeries(filters),
-        getPaymentHeatmapData(filters),
-        getBapendaSummary(filters),
-        getJRSummary(filters)
-      ]);
-
-      setStats(statsRes);
-      setFilteredCityData(cityRes);
-      setFilteredKabupatenData(kabupatenRes);
-      setFilteredDetailedData(transRes);
-      setTotalTransactions(totalRes);
-      setArrearsByYearData(arrearsYearRes);
-      setArrearsByLocationData(arrearsLocRes);
-      setHeatmapData(heatmapDataRes);
-      setForecastData(forecastRes);
-      setKecamatanForecastData(kecForecastRes);
-      setPaymentHeatmapData(paymentHeatmapRes);
-      setBapendaData(bapendaRes);
-      setJRData(jrRes);
-      setCurrentPage(page);
-    } catch (error) {
-      console.error("Failed to fetch dashboard data:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Visual refresh indicator
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setCurrentPage(1);  // reset page on filter change
-      fetchAllData(1);
-    }, 500);
+    setIsRefreshing(true);
+    const timer = setTimeout(() => setIsRefreshing(false), 800);
     return () => clearTimeout(timer);
-  }, [selectedCity, selectedYear, selectedMonth, selectedDay, selectedGolongan, searchQuery, selectedKecamatan, selectedDesa, selectedJenis]);
+  }, [currentFilters]);
 
   const resetFilters = () => {
     setSelectedCity('Semua');
@@ -210,7 +124,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#fcfcfd] text-slate-900 selection:bg-indigo-100 pb-20">
-      {/* Top Navigation / Branding */}
       <header className="sticky top-0 z-50 w-full border-b border-slate-200/60 bg-white/80 backdrop-blur-md">
         <div className="container mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -221,12 +134,12 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-4">
              <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[13px] font-bold uppercase tracking-wider">
-                {isLoading ? (
+                {isRefreshing ? (
                   <Loader2 className="w-3 h-3 animate-spin" />
                 ) : (
                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
                 )}
-                {isLoading ? 'Fetching Data...' : 'Live Operational'}
+                {isRefreshing ? 'Refreshing Data...' : 'Live Operational'}
              </div>
              <Separator orientation="vertical" className="h-6" />
              <Button variant="ghost" size="icon" className="text-slate-400 hover:text-indigo-600">
@@ -237,8 +150,6 @@ export default function DashboardPage() {
       </header>
 
       <main className="container mx-auto px-6 py-10 space-y-10">
-        
-        {/* Hero Section & Search */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
           <div>
             <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Dashboard Ringkasan</h2>
@@ -362,83 +273,23 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Subtle loading bar for re-filter */}
-        <div className={`h-0.5 w-full rounded-full overflow-hidden transition-opacity duration-300 ${isLoading ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`h-0.5 w-full rounded-full overflow-hidden transition-opacity duration-300 ${isRefreshing ? 'opacity-100' : 'opacity-0'}`}>
           <div className="h-full bg-gradient-to-r from-indigo-400 via-violet-400 to-indigo-400 animate-[shimmer_1.2s_ease-in-out_infinite] w-1/3" />
         </div>
 
-        {/* KPI Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {isLoading ? (
-            <>
-              <KPICardSkeleton />
-              <KPICardSkeleton />
-              <KPICardSkeleton />
-              <KPICardSkeleton />
-            </>
-          ) : (
-            <>
-              <KPICard title="Total Potensi" value={stats ? formatCurrencyShort(stats.totalPotensi) : "---"} trend={12} icon={DollarSign} iconColor="indigo" delay={0.1} />
-              <KPICard title="Total Tunggakan" value={stats ? formatCurrencyShort(stats.totalTunggakan) : "---"} trend={-4} icon={AlertCircle} iconColor="rose" delay={0.2} />
-              <KPICard title="Kepatuhan" value={stats ? `${formatNumber(parseFloat(stats.kepatuhan), 1)}%` : "---"} trend={2} icon={Activity} iconColor="emerald" delay={0.3} />
-              <KPICard title="Rata-rata Terlambat" value={stats ? `${formatNumber(stats.avgDelay)} Hari` : "---"} trend={-8} icon={Clock} iconColor="amber" delay={0.4} />
-            </>
-          )}
-        </div>
+        {/* 1. KPI Cards */}
+        <KpiStatsContainer filters={currentFilters} />
 
-        {/* Charts Section */}
-        <section>
-          <div className="flex items-center gap-4 mb-6">
-             <h3 className="text-lg font-bold text-slate-900 tracking-tight">Visualisasi Data</h3>
-             <Separator className="flex-1" />
-          </div>
-          {isLoading ? (
-            <div className="space-y-6">
-              <HeatmapSkeleton />
-              <HeatmapSkeleton />
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <ChartCardSkeleton />
-                <ChartCardSkeleton />
-                <ChartCardSkeleton />
-                <ChartCardSkeleton />
-                <ChartCardSkeleton height="h-80" />
-                <ChartCardSkeleton height="h-80" />
-              </div>
-            </div>
-          ) : (
-            <ChartsGrid 
-              data={filteredCityData}
-              kabupatenData={filteredKabupatenData} 
-              arrearsByYearData={arrearsByYearData}
-              arrearsByLocationData={arrearsByLocationData}
-              heatmapData={heatmapData}
-              forecastData={forecastData}
-              kecamatanForecastData={kecamatanForecastData}
-              paymentHeatmapData={paymentHeatmapData}
-              totalRows={totalTransactions}
-              complianceData={stats.complianceDist}
-              bapendaData={bapendaData}
-              jrData={jrData}
-            />
-          )}
-        </section>
+        {/* 2. Charts & Visualizations */}
+        <ChartsGrid filters={currentFilters} />
 
-        {/* Table Section */}
+        {/* 3. Detailed Data Table */}
         <section>
           <div className="flex items-center gap-4 mb-6">
              <h3 className="text-lg font-bold text-slate-900 tracking-tight">Analisis Detail</h3>
              <Separator className="flex-1" />
           </div>
-          {isLoading ? (
-            <TableSkeleton />
-          ) : (
-            <TransactionTable 
-              data={filteredDetailedData} 
-              currentPage={currentPage}
-              totalCount={totalTransactions}
-              onPageChange={(page) => fetchAllData(page)}
-            />
-          )}
+          <TransactionsContainer filters={currentFilters} />
         </section>
 
       </main>
@@ -456,3 +307,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

@@ -14,7 +14,7 @@ async function checkPopulated() {
         bbm, bahan_bakar,
         tahun_buat, thn_buat,
         kecamatan, nama_kec
-      FROM data_kendaraan_pajak
+      FROM data_kendaraan_pajak_new
       LIMIT 10
     `);
     

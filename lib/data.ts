@@ -12,7 +12,11 @@ export const formatCurrencyShort = (numInMillions: number) => {
   if (numInMillions >= 1000) {
     return `Rp ${formatNumber(numInMillions / 1000, 2)} M`;
   }
-  return `Rp ${formatNumber(numInMillions, 1)} Juta`;
+  if (numInMillions >= 1) {
+    return `Rp ${formatNumber(numInMillions, 1)} Jt`;
+  }
+  if (numInMillions === 0) return "Rp 0";
+  return `Rp ${formatNumber(numInMillions * 1000000, 0)}`;
 };
 
 export const formatNumberShort = (numInMillions: number) => {
@@ -22,7 +26,11 @@ export const formatNumberShort = (numInMillions: number) => {
   if (numInMillions >= 1000) {
     return `${formatNumber(numInMillions / 1000, 2)} M`;
   }
-  return `${formatNumber(numInMillions, 1)} Jt`;
+  if (numInMillions >= 1) {
+    return `${formatNumber(numInMillions, 1)} Jt`;
+  }
+  if (numInMillions === 0) return "0";
+  return formatNumber(numInMillions * 1000000, 0);
 };
 
 export type CityData = {
@@ -56,6 +64,8 @@ export type DetailedData = {
   nomor_rangka?: string;
   nik?: string;
   no_hp?: string;
+  cc?: string;
+  fungsi?: string;
   // Detail Pajak Tambahan
   bbnkb?: number;
   opsen_bbnkb?: number;
@@ -66,6 +76,10 @@ export type DetailedData = {
   desa_kelurahan?: string;
   kabupaten?: string;
   masa_pajak_sampai?: string;
+  // AI & Labelling
+  ai_reminder?: string;
+  customer_labelling?: string;
+  next_best_action?: string;
 };
 
 export type ArrearsByYear = {
@@ -114,12 +128,6 @@ export const RAW_DETAILED_DATA: DetailedData[] = [
   { id: "SG17", samsat: "KAPUAS", nopol: "KH5566CC", pemilik: "DIANA PUSPITA", alamat: "JL. AHMAD YANI NO. 45", pokok: 1200000, denda: 0, opsen: 800000, status: "Lunas", date: "2024-11-20" }
 ];
 
-export const complianceDataConstant = [
-  { "name": "Tidak Patuh", "value": 197490 },
-  { "name": "Kurang Patuh", "value": 20037 },
-  { "name": "Sangat Patuh", "value": 469693 }
-];
-
 export const getRiskData = () => {
   return RAW_CITY_DATA.map(city => ({
     name: city.name,
@@ -166,7 +174,6 @@ export const COLORS = {
 };
 
 export const CHART_PALETTE = ['#818cf8', '#a5b4fc', '#c7d2fe'];
-export const COMPLIANCE_COLORS = [COLORS.danger, COLORS.warning, COLORS.success];
 
 export interface HeatmapPoint {
   name: string;

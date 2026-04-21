@@ -28,17 +28,17 @@ export function getFilterClause(filters: DashboardFilters): { text: string; valu
   // Date Filters
   if (filters.year !== 'Semua') {
     // Handling case where paid_on or masa_pajak_sampai is used
-    conditions.push(`(LEFT(COALESCE(paid_on, masa_pajak_sampai), 4) = $${paramIdx++})`);
+    conditions.push(`(LEFT(COALESCE(paid_on::text, masa_pajak_sampai::text), 4) = $${paramIdx++})`);
     values.push(filters.year);
   }
 
   if (filters.month !== 'Semua') {
-    conditions.push(`(SUBSTRING(COALESCE(paid_on, masa_pajak_sampai), 6, 2) = $${paramIdx++})`);
+    conditions.push(`(SUBSTRING(COALESCE(paid_on::text, masa_pajak_sampai::text), 6, 2) = $${paramIdx++})`);
     values.push(filters.month);
   }
 
   if (filters.day !== 'Semua') {
-    conditions.push(`(SUBSTRING(COALESCE(paid_on, masa_pajak_sampai), 9, 2) = $${paramIdx++})`);
+    conditions.push(`(SUBSTRING(COALESCE(paid_on::text, masa_pajak_sampai::text), 9, 2) = $${paramIdx++})`);
     values.push(filters.day);
   }
 
@@ -66,13 +66,13 @@ export function getFilterClause(filters: DashboardFilters): { text: string; valu
 export const SQL_NUMERIC_CAST = (col: string) => `COALESCE(NULLIF(REPLACE(${col}, ',', ''), '')::numeric, 0)`;
 
 // Calculate delay in months/days for fines
-export const SQL_MONTHS_DELAYED = `GREATEST(0, (EXTRACT(YEAR FROM age(CURRENT_DATE, TO_DATE(masa_pajak_sampai, 'YYYY-MM-DD'))) * 12 + EXTRACT(MONTH FROM age(CURRENT_DATE, TO_DATE(masa_pajak_sampai, 'YYYY-MM-DD')))))`;
-export const SQL_DAYS_DELAYED = `GREATEST(0, (CURRENT_DATE - TO_DATE(masa_pajak_sampai, 'YYYY-MM-DD')))`;
+export const SQL_MONTHS_DELAYED = `GREATEST(0, (EXTRACT(YEAR FROM age(CURRENT_DATE, masa_pajak_sampai::date)) * 12 + EXTRACT(MONTH FROM age(CURRENT_DATE, masa_pajak_sampai::date))))`;
+export const SQL_DAYS_DELAYED = `GREATEST(0, (CURRENT_DATE - masa_pajak_sampai::date))`;
 
 // Bapenda Denda Rate: 1% per month + 1% (max 24%)
 export const SQL_BAPENDA_DENDA_RATE = `
   CASE 
-    WHEN TO_DATE(masa_pajak_sampai, 'YYYY-MM-DD') < CURRENT_DATE 
+    WHEN masa_pajak_sampai::date < CURRENT_DATE 
     THEN LEAST(0.24, (${SQL_MONTHS_DELAYED} + 1) * 0.01)
     ELSE 0 
   END
@@ -92,13 +92,13 @@ export const SQL_JR_DENDA_RATE = `
 // Formula for Jasa Raharja (JR) Potensi
 export const SQL_JR_POKOK = `
   CASE 
-    WHEN gol_jr = 'C1' OR gol_jr = 'B' THEN 35000
-    WHEN gol_jr = 'C2' THEN 83000
-    WHEN gol_jr = 'DP' OR gol_jr = 'DU' THEN 143000
-    WHEN gol_jr = 'E' THEN 153000
-    WHEN gol_jr = 'F' THEN 163000
-    WHEN gol_jr = 'G' THEN 276000
-    WHEN gol_jr = 'H' THEN 476000
+    WHEN kode_jenken = 'B' THEN 35000
+    WHEN kode_jenken = 'C' THEN 83000
+    WHEN kode_jenken = 'D' THEN 143000
+    WHEN kode_jenken = 'E' THEN 153000
+    WHEN kode_jenken = 'F' THEN 163000
+    WHEN kode_jenken = 'G' THEN 276000
+    WHEN kode_jenken = 'H' THEN 476000
     ELSE ${SQL_NUMERIC_CAST('pokok_swdkllj')}
   END
 `;

@@ -15,7 +15,7 @@ async function verifyRaw() {
         nama_pemilik, alamat, jenis_kendaraan, merk_kendaraan, tipe_kendaraan,
         tahun_buat, bbm, warna_plat, nomor_mesin, nomor_rangka, nik, no_hp,
         nama_kabkota, nama_kec, nama_kel
-      FROM data_kendaraan_pajak
+      FROM data_kendaraan_pajak_new
       LIMIT 1
     `);
     

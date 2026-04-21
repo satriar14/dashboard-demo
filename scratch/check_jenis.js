@@ -9,7 +9,7 @@ async function checkJenis() {
     const res = await pool.query(`
       SELECT 
         jenis_kendaraan, tipe, tipe_kendaraan
-      FROM data_kendaraan_pajak
+      FROM data_kendaraan_pajak_new
       LIMIT 10
     `);
     

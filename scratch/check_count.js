@@ -6,7 +6,7 @@ async function checkCount() {
   });
 
   try {
-    const res = await pool.query('SELECT count(*) FROM data_kendaraan_pajak');
+    const res = await pool.query('SELECT count(*) FROM data_kendaraan_pajak_new');
     console.log(`Total rows: ${res.rows[0].count}`);
   } catch (err) {
     console.error(err);

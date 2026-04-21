@@ -27,7 +27,9 @@ import {
   ExternalLink,
   Car,
   ShieldCheck,
-  Phone
+  Phone,
+  Sparkles,
+  Activity
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { DetailedData, formatNumber } from "@/lib/data";
@@ -176,6 +178,37 @@ function TransactionDetailModal({
 
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-slate-900 mb-2">
+               <Sparkles size={16} className="text-indigo-600 fill-indigo-100" />
+               <h4 className="text-xs font-bold uppercase tracking-wider">AI Insight & Rekomendasi</h4>
+            </div>
+            <div className="grid grid-cols-1 gap-3">
+               <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-white p-1.5 rounded-lg shadow-sm">
+                      <Activity size={14} className="text-indigo-600" />
+                    </div>
+                    <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">AI Reminder</p>
+                  </div>
+                  <p className="text-sm font-semibold text-slate-800 leading-relaxed">
+                    {transaction.ai_reminder || 'Tidak ada pengingat khusus saat ini.'}
+                  </p>
+               </div>
+               <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100/50 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-white p-1.5 rounded-lg shadow-sm">
+                      <Sparkles size={14} className="text-emerald-600" />
+                    </div>
+                    <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Next Best Action</p>
+                  </div>
+                  <p className="text-sm font-semibold text-slate-800 leading-relaxed">
+                    {transaction.next_best_action || 'Lanjutkan pemantauan rutin.'}
+                  </p>
+               </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-slate-900 mb-2">
                <CreditCard size={16} className="text-indigo-600" />
                <h4 className="text-xs font-bold uppercase tracking-wider">Rincian Pembayaran</h4>
             </div>
@@ -280,6 +313,7 @@ export function TransactionTable({ data, currentPage, totalCount, onPageChange }
                   <TableHead className="font-bold uppercase text-[10px] tracking-widest w-[300px]">Pemilik & Alamat</TableHead>
                   <TableHead className="font-bold uppercase text-[10px] tracking-widest">Pokok PKB</TableHead>
                   <TableHead className="font-bold uppercase text-[10px] tracking-widest text-center">Status</TableHead>
+                  <TableHead className="font-bold uppercase text-[10px] tracking-widest min-w-[200px]">Next Best Action</TableHead>
                   <TableHead className="font-bold uppercase text-[10px] tracking-widest text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
@@ -318,6 +352,18 @@ export function TransactionTable({ data, currentPage, totalCount, onPageChange }
                           {row.status}
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                           {row.next_best_action ? (
+                             <Badge variant="outline" className="bg-indigo-50/30 text-indigo-700 border-indigo-100 text-[10px] py-1 px-2 font-medium flex items-center gap-1.5 rounded-lg">
+                                <Sparkles size={10} className="text-indigo-500 fill-indigo-500" />
+                                {row.next_best_action}
+                             </Badge>
+                           ) : (
+                             <span className="text-[10px] text-slate-400 italic font-medium">No action recommended</span>
+                           )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end">
                             <Button 
@@ -334,7 +380,7 @@ export function TransactionTable({ data, currentPage, totalCount, onPageChange }
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center text-slate-400 italic">
+                    <TableCell colSpan={8} className="h-32 text-center text-slate-400 italic">
                       Tidak ada data ditemukan.
                     </TableCell>
                   </TableRow>
