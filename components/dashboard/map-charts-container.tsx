@@ -24,10 +24,10 @@ export function MapChartsContainer({ filters }: MapChartsContainerProps) {
     async function fetchData() {
       setIsLoading(true);
       try {
-        const [hRes, pRes] = await Promise.all([
-          getHeatmapData(filters),
-          getPaymentHeatmapData(filters)
-        ]);
+        // Sequentialize heavy map queries to reduce peak load
+        const hRes = await getHeatmapData(filters);
+        const pRes = await getPaymentHeatmapData(filters);
+        
         setHeatmapData(hRes);
         setPaymentHeatmapData(pRes);
       } catch (error) {

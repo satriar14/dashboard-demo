@@ -71,8 +71,9 @@ export function ComplianceSectionContainer({ filters }: ComplianceSectionContain
           <MoreVertical className="h-4 w-4 text-slate-400" />
         </CardHeader>
         <CardContent>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-64 mt-4 min-w-0 overflow-hidden">
+            {!isLoading && data.length > 0 && (
+              <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie 
                   data={data} 
@@ -94,6 +95,7 @@ export function ComplianceSectionContainer({ filters }: ComplianceSectionContain
                 />
               </PieChart>
             </ResponsiveContainer>
+            )}
           </div>
           <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-2">
             {data.map((item, i) => (

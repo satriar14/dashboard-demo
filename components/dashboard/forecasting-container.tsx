@@ -25,11 +25,11 @@ export function ForecastingContainer({ filters }: ForecastingContainerProps) {
     async function fetchData() {
       setIsLoading(true);
       try {
-        const [fRes, kRes, tRes] = await Promise.all([
-          getForecastData(filters),
-          getKecamatanForecastSeries(filters),
-          getTotalTransactions(filters)
-        ]);
+        // Sequentialize heavy aggregation queries to reduce peak shared memory load
+        const fRes = await getForecastData(filters);
+        const kRes = await getKecamatanForecastSeries(filters);
+        const tRes = await getTotalTransactions(filters);
+        
         setForecastData(fRes);
         setKecamatanForecastData(kRes);
         setTotalRows(tRes);
@@ -65,8 +65,9 @@ export function ForecastingContainer({ filters }: ForecastingContainerProps) {
             <TrendingUp className="h-5 w-5 text-indigo-500" />
           </CardHeader>
           <CardContent className="relative z-10">
-            <div className="h-72 mt-4">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-72 mt-4 min-w-0 overflow-hidden">
+              {!isLoading && forecastData.length > 0 && (
+                <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={forecastData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
                   <defs>
                     <linearGradient id="colorReal" x1="0" y1="0" x2="0" y2="1">
@@ -123,6 +124,7 @@ export function ForecastingContainer({ filters }: ForecastingContainerProps) {
                   </Area>
                 </AreaChart>
               </ResponsiveContainer>
+              )}
             </div>
             <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4 pb-2">
                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
@@ -159,9 +161,10 @@ export function ForecastingContainer({ filters }: ForecastingContainerProps) {
               <TrendingUp className="h-5 w-5 text-indigo-400" />
             </CardHeader>
             <CardContent className="relative z-10">
-              <div className="h-80 mt-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={kecamatanForecastData.data} margin={{ top: 10, right: 30, left: -10, bottom: 20 }}>
+              <div className="h-80 mt-4 min-w-0 overflow-hidden">
+                {!isLoading && kecamatanForecastData.data && (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={kecamatanForecastData.data} margin={{ top: 10, right: 30, left: -10, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis 
                       dataKey="x" 
@@ -201,6 +204,7 @@ export function ForecastingContainer({ filters }: ForecastingContainerProps) {
                     ))}
                   </LineChart>
                 </ResponsiveContainer>
+                )}
               </div>
               <p className="text-[10px] text-slate-400 mt-4 italic text-center uppercase tracking-wide">Grafik menampilkan data historis dan proyeksi 3 bulan ke depan secara berkelanjutan</p>
             </CardContent>

@@ -52,10 +52,8 @@ export async function getDashboardStats(filters: DashboardFilters) {
     ORDER BY value DESC
   `;
 
-  const [{ rows: statsRows }, { rows: labelRows }] = await Promise.all([
-    pool.query(statsQuery, [...values, now]),
-    pool.query(labelsQuery, values)
-  ]);
+  const { rows: statsRows } = await pool.query(statsQuery, [...values, now]);
+  const { rows: labelRows } = await pool.query(labelsQuery, values);
 
   const row = statsRows[0];
   const totalPotensiVal = parseFloat(row.total_potensi_val || 0);

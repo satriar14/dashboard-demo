@@ -19,10 +19,9 @@ export function TransactionsContainer({ filters }: TransactionsContainerProps) {
   const fetchTransactions = async (page: number) => {
     setIsLoading(true);
     try {
-      const [transRes, totalRes] = await Promise.all([
-        getTransactions(filters, page),
-        getTotalTransactions(filters)
-      ]);
+      // Sequentialize fetches to reduce database pressure
+      const transRes = await getTransactions(filters, page);
+      const totalRes = await getTotalTransactions(filters);
       setData(transRes);
       setTotalCount(totalRes);
       setCurrentPage(page);

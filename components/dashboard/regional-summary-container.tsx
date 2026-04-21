@@ -24,10 +24,10 @@ export function RegionalSummaryContainer({ filters }: RegionalSummaryContainerPr
     async function fetchData() {
       setIsLoading(true);
       try {
-        const [bRes, jRes] = await Promise.all([
-          getBapendaSummary(filters),
-          getJRSummary(filters)
-        ]);
+        // Sequentialize heavy fetches to avoid peak resource contention
+        const bRes = await getBapendaSummary(filters);
+        const jRes = await getJRSummary(filters);
+        
         setBapendaData(bRes);
         setJRData(jRes);
       } catch (error) {
@@ -64,9 +64,10 @@ export function RegionalSummaryContainer({ filters }: RegionalSummaryContainerPr
             </div>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="h-80 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={bapendaData} layout="vertical" margin={{ left: 30, right: 30 }}>
+            <div className="h-80 w-full min-w-0 overflow-hidden">
+              {!isLoading && bapendaData.length > 0 && (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={bapendaData} layout="vertical" margin={{ left: 30, right: 30 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                   <XAxis type="number" hide />
                   <YAxis 
@@ -81,11 +82,12 @@ export function RegionalSummaryContainer({ filters }: RegionalSummaryContainerPr
                     formatter={(v: any) => formatCurrencyShort(Number(v))} 
                     contentStyle={{ borderRadius: '10px', border: 'none', fontSize: '14px' }} 
                   />
-                  <Bar dataKey="value" fill="#6366f1" radius={[0, 6, 6, 0]} barSize={12}>
-                    <LabelList dataKey="value" position="right" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} offset={10} formatter={(v: any) => formatNumberShort(Number(v))} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+                    <Bar dataKey="value" fill="#6366f1" radius={[0, 6, 6, 0]} barSize={12}>
+                      <LabelList dataKey="value" position="right" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} offset={10} formatter={(v: any) => formatNumberShort(Number(v))} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -103,9 +105,10 @@ export function RegionalSummaryContainer({ filters }: RegionalSummaryContainerPr
             </div>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="h-80 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={jrData} layout="vertical" margin={{ left: 30, right: 30 }}>
+            <div className="h-80 w-full min-w-0 overflow-hidden">
+              {!isLoading && jrData.length > 0 && (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={jrData} layout="vertical" margin={{ left: 30, right: 30 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                   <XAxis type="number" hide />
                   <YAxis 
@@ -120,11 +123,12 @@ export function RegionalSummaryContainer({ filters }: RegionalSummaryContainerPr
                     formatter={(v: any) => formatCurrencyShort(Number(v))} 
                     contentStyle={{ borderRadius: '10px', border: 'none', fontSize: '14px' }} 
                   />
-                  <Bar dataKey="value" fill="#10b981" radius={[0, 6, 6, 0]} barSize={12}>
-                    <LabelList dataKey="value" position="right" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} offset={10} formatter={(v: any) => formatNumberShort(Number(v))} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+                    <Bar dataKey="value" fill="#10b981" radius={[0, 6, 6, 0]} barSize={12}>
+                      <LabelList dataKey="value" position="right" style={{ fontSize: '10px', fontWeight: 'bold', fill: '#64748b' }} offset={10} formatter={(v: any) => formatNumberShort(Number(v))} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
