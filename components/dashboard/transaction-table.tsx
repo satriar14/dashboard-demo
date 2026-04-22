@@ -50,8 +50,7 @@ function TransactionDetailModal({
                 (transaction.swdkllj || 0) + 
                 (transaction.denda_swdkllj || 0);
 
-  const fullAddress = [
-    transaction.alamat,
+  const fullAddress = transaction.alamat || [
     transaction.desa_kelurahan,
     transaction.kecamatan,
     transaction.kabupaten

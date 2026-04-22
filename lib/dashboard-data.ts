@@ -125,7 +125,7 @@ export async function getDashboardData(): Promise<DetailedData[]> {
         samsat: row.upt_nama || kabupaten,
         nopol,
         pemilik: row.nama_pemilik || '',
-        alamat: '',  // tidak ada kolom alamat di view baru; gunakan kec+kel
+        alamat: [row.nama_kel, row.nama_kec, kabupaten].filter(Boolean).join(', '),
         pokok: parseNum(row.pokok_pkb),
         denda: dendaTotal,
         opsen: parseNum(row.opsen_pokok_pkb),

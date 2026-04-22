@@ -169,7 +169,7 @@ export async function getTransactions(filters: DashboardFilters, page: number = 
       samsat: row.upt_nama || row.nama_kabkota || 'N/A',
       nopol,
       pemilik: row.nama_pemilik || '',
-      alamat: '',  // tidak ada kolom alamat di v_data_transaksi_kendaraan
+      alamat: [row.nama_kel, row.nama_kec, row.nama_kabkota].filter(Boolean).join(', '),
       pokok: parseFloat(row.pokok || 0),
       denda: parseFloat(row.denda || 0),
       opsen: parseFloat(row.opsen || 0),
