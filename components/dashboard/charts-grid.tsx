@@ -19,8 +19,8 @@ export function ChartsGrid({ filters }: ChartsGridProps) {
       {/* 1. Maps Section */}
       <section>
         <div className="flex items-center gap-4 mb-6">
-           <h3 className="text-lg font-bold text-slate-900 tracking-tight">Visualisasi Geografis</h3>
-           <Separator className="flex-1" />
+          <h3 className="text-lg font-bold text-slate-900 tracking-tight">Visualisasi Geografis</h3>
+          <Separator className="flex-1" />
         </div>
         <MapChartsContainer filters={filters} />
       </section>
@@ -28,8 +28,8 @@ export function ChartsGrid({ filters }: ChartsGridProps) {
       {/* 2. Main Analytics Section */}
       <section>
         <div className="flex items-center gap-4 mb-6">
-           <h3 className="text-lg font-bold text-slate-900 tracking-tight">Analisis Kepatuhan & Perbandingan</h3>
-           <Separator className="flex-1" />
+          <h3 className="text-lg font-bold text-slate-900 tracking-tight">Analisis Kepatuhan & Perbandingan</h3>
+          <Separator className="flex-1" />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <ComplianceSectionContainer filters={filters} />
@@ -40,8 +40,8 @@ export function ChartsGrid({ filters }: ChartsGridProps) {
       {/* 3. Trends & Arrears Section */}
       <section>
         <div className="flex items-center gap-4 mb-6">
-           <h3 className="text-lg font-bold text-slate-900 tracking-tight">Tren & Penunggakan</h3>
-           <Separator className="flex-1" />
+          <h3 className="text-lg font-bold text-slate-900 tracking-tight">Tren & Penunggakan</h3>
+          <Separator className="flex-1" />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <ArrearsTrendsContainer filters={filters} />
@@ -51,20 +51,20 @@ export function ChartsGrid({ filters }: ChartsGridProps) {
       {/* 4. Forecasting Section */}
       <section>
         <div className="flex items-center gap-4 mb-6">
-           <h3 className="text-lg font-bold text-slate-900 tracking-tight">Prediksi & Proyeksi</h3>
-           <Separator className="flex-1" />
+          <h3 className="text-lg font-bold text-slate-900 tracking-tight">Prediksi & Proyeksi</h3>
+          <Separator className="flex-1" />
         </div>
         <ForecastingContainer filters={filters} />
       </section>
 
       {/* 5. Regional Contribution Section */}
-      <section>
+      {/* <section>
         <div className="flex items-center gap-4 mb-6">
            <h3 className="text-lg font-bold text-slate-900 tracking-tight">Kontribusi Wilayah</h3>
            <Separator className="flex-1" />
         </div>
         <RegionalSummaryContainer filters={filters} />
-      </section>
+      </section> */}
     </div>
   );
 }

@@ -3,12 +3,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList, Cell
 } from 'recharts';
 import { motion } from "framer-motion";
 import { ChartCardSkeleton } from "./skeleton-loader";
-import { getArrearsByProdYear, getArrearsByLocation, DashboardFilters } from "@/lib/api-actions";
-import { COLORS, formatNumber } from "@/lib/data";
+import { getArrearsByProdYear, getArrearsByLocation, getArrearsDaysDistribution, DashboardFilters } from "@/lib/api-actions";
+import { COLORS, formatNumber, ArrearsDaysDist } from "@/lib/data";
 
 interface ArrearsTrendsContainerProps {
   filters: DashboardFilters;
@@ -16,7 +16,7 @@ interface ArrearsTrendsContainerProps {
 
 export function ArrearsTrendsContainer({ filters }: ArrearsTrendsContainerProps) {
   const [arrearsByYearData, setArrearsByYearData] = useState<any[]>([]);
-  const [arrearsByLocationData, setArrearsByLocationData] = useState<any[]>([]);
+  const [arrearsDaysDist, setArrearsDaysDist] = useState<ArrearsDaysDist[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -25,10 +25,10 @@ export function ArrearsTrendsContainer({ filters }: ArrearsTrendsContainerProps)
       try {
         // Sequentialize queries to prevent shared memory pressure
         const yRes = await getArrearsByProdYear(filters);
-        const lRes = await getArrearsByLocation(filters);
+        const dRes = await getArrearsDaysDistribution(filters);
         
         setArrearsByYearData(yRes);
-        setArrearsByLocationData(lRes);
+        setArrearsDaysDist(dRes);
       } catch (error) {
         console.error("Failed to fetch arrears trends data:", error);
       } finally {
@@ -93,36 +93,43 @@ export function ArrearsTrendsContainer({ filters }: ArrearsTrendsContainerProps)
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}>
         <Card className="h-full border-slate-200/60 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Top 10 Kecamatan Tertunggak</CardTitle>
+            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Analisis Ketepatan Waktu & Tunggakan</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-64 mt-4 min-w-0 overflow-hidden">
-              {!isLoading && arrearsByLocationData.length > 0 && (
+              {!isLoading && arrearsDaysDist.length > 0 && (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={arrearsByLocationData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="0" horizontal={false} stroke="#f1f5f9" />
-                    <XAxis type="number" hide />
-                    <YAxis 
-                      dataKey="name" 
-                      type="category" 
+                  <BarChart data={arrearsDaysDist} margin={{ top: 20, right: 30, left: 10, bottom: 40 }}>
+                    <CartesianGrid strokeDasharray="0" vertical={false} stroke="#f1f5f9" />
+                    <XAxis 
+                      dataKey="category" 
                       axisLine={false} 
                       tickLine={false} 
                       tick={{ fontSize: 9, fontWeight: '600', fill: '#64748b' }} 
-                      width={100}
+                      angle={-45}
+                      textAnchor="end"
+                      height={60}
                     />
+                    <YAxis hide />
                     <Tooltip 
                       cursor={{ fill: '#f8fafc' }} 
-                      contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', fontSize: '14px' }}
-                      formatter={(v: any) => [`${formatNumber(Number(v))} Kendaraan`, 'Jumlah Tunggakan']}
+                      contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', fontSize: '12px' }}
+                      formatter={(v: any) => [`${formatNumber(Number(v))} Kendaraan`, 'Jumlah']}
                     />
-                    <Bar dataKey="jumlah_kendaraan" fill={COLORS.danger} radius={[0, 4, 4, 0]} barSize={16} opacity={0.9}>
-                      <LabelList dataKey="jumlah_kendaraan" position="right" style={{ fontSize: '9px', fontWeight: 'bold', fill: '#f43f5e' }} offset={10} formatter={(v: any) => formatNumber(Number(v))} />
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={24}>
+                      {arrearsDaysDist.map((entry, index) => (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={entry.sort_order <= 4 ? '#10b981' : COLORS.danger} 
+                        />
+                      ))}
+                      <LabelList dataKey="value" position="top" style={{ fontSize: '9px', fontWeight: 'bold', fill: '#64748b' }} offset={10} formatter={(v: any) => formatNumber(Number(v))} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               )}
             </div>
-            <p className="text-[10px] text-slate-400 mt-2 italic text-center uppercase tracking-wide">Wilayah dengan jumlah tunggakan tertinggi</p>
+            <p className="text-[10px] text-slate-400 mt-2 italic text-center uppercase tracking-wide">Distribusi berdasarkan hari tunggakan (negatif = awal, positif = tahun terlambat)</p>
           </CardContent>
         </Card>
       </motion.div>

@@ -1,6 +1,6 @@
 "use server";
 
-import { CityData, DetailedData, ArrearsByYear, ArrearsByLocation, HeatmapPoint } from "./data";
+import { CityData, DetailedData, ArrearsByYear, ArrearsByLocation, HeatmapPoint, ArrearsDaysDist } from "./data";
 import { getCoords } from "./coordinates";
 import { pool } from "./db";
 import { 
@@ -538,4 +538,47 @@ export async function getJRSummary(filters: DashboardFilters) {
   `;
   const { rows } = await pool.query(query, values);
   return rows.map(r => ({ name: r.name, value: parseFloat(r.value || 0) }));
+}
+
+export async function getArrearsDaysDistribution(filters: DashboardFilters): Promise<ArrearsDaysDist[]> {
+  const { text: filterClause, values } = getFilterClause(filters);
+  
+  const query = `
+    SELECT 
+      CASE 
+        WHEN hari_tunggakan < -90 THEN '> 90 Hari Awal'
+        WHEN hari_tunggakan < -30 THEN '31 - 90 Hari Awal'
+        WHEN hari_tunggakan < 0 THEN '1 - 30 Hari Awal'
+        WHEN hari_tunggakan = 0 THEN 'Tepat Waktu'
+        WHEN hari_tunggakan <= 365 THEN '1 Tahun Terlambat'
+        WHEN hari_tunggakan <= 730 THEN '2 Tahun Terlambat'
+        WHEN hari_tunggakan <= 1095 THEN '3 Tahun Terlambat'
+        WHEN hari_tunggakan <= 1460 THEN '4 Tahun Terlambat'
+        ELSE '> 4 Tahun Terlambat'
+      END as category,
+      CASE 
+        WHEN hari_tunggakan < -90 THEN 1
+        WHEN hari_tunggakan < -30 THEN 2
+        WHEN hari_tunggakan < 0 THEN 3
+        WHEN hari_tunggakan = 0 THEN 4
+        WHEN hari_tunggakan <= 365 THEN 5
+        WHEN hari_tunggakan <= 730 THEN 6
+        WHEN hari_tunggakan <= 1095 THEN 7
+        WHEN hari_tunggakan <= 1460 THEN 8
+        ELSE 9
+      END as sort_order,
+      COUNT(*)::int as value
+    FROM v_data_transaksi_kendaraan
+    ${filterClause}
+    GROUP BY category, sort_order
+    ORDER BY sort_order ASC
+  `;
+
+  const { rows } = await pool.query(query, values);
+
+  return rows.map(row => ({
+    category: row.category,
+    value: row.value,
+    sort_order: row.sort_order
+  }));
 }

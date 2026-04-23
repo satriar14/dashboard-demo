@@ -92,6 +92,13 @@ export type ArrearsByLocation = {
   jumlah_kendaraan: number;
 };
 
+export type ArrearsDaysDist = {
+  category: string;
+  value: number;
+  color?: string;
+  sort_order: number;
+};
+
 export const RAW_CITY_DATA: CityData[] = [
   { name: "PALANGKA RAYA", pkb: 83860, tunggakan: 3694, potensi: 87555, keterlambatan: 514, golongan: "All" },
   { name: "KOTAWARINGIN TIMUR", pkb: 68610, tunggakan: 2866, potensi: 71476, keterlambatan: 398, golongan: "All" },
