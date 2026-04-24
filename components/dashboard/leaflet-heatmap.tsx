@@ -174,7 +174,7 @@ export default function LeafletHeatmap({
               {/* Invisible trigger area for hover/click - using meters to match jitter spread */}
               <Circle
                 center={marker.position}
-                radius={12000} // ~12km radius to cover the jitter spread
+                radius={colorScheme === 'payments' ? 45000 : 20000} // Radius scaled to cover the visual heat blob
                 pathOptions={{ 
                   fillColor: 'transparent', 
                   color: 'transparent',
