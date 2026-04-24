@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useId } from 'react';
-import { MapContainer, TileLayer, useMap, Marker, Tooltip, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, Marker, Tooltip, Popup, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 // @ts-ignore
@@ -170,53 +170,67 @@ export default function LeafletHeatmap({
 
 
           {cityMarkers.map((marker, i) => (
-            <Marker 
-              key={i} 
-              position={marker.position} 
-              icon={L.divIcon({ 
-                className: 'bg-transparent', 
-                iconSize: [0, 0],
-                html: `<div class="p-1 px-2 ${markerBg} text-white text-[9px] font-bold rounded shadow-lg border whitespace-nowrap -translate-x-1/2 -translate-y-full">${marker.name}</div>`
-              })}
-            >
-              <Tooltip 
-                permanent={false} 
-                direction="top" 
-                className="bg-white/95 border border-slate-200 shadow-xl rounded-xl p-2 px-3 backdrop-blur-md"
-                offset={[0, -10]}
+            <div key={`marker-group-${i}`}>
+              {/* Invisible trigger area for hover/click - using meters to match jitter spread */}
+              <Circle
+                center={marker.position}
+                radius={12000} // ~12km radius to cover the jitter spread
+                pathOptions={{ 
+                  fillColor: 'transparent', 
+                  color: 'transparent',
+                  interactive: true 
+                }}
               >
-                <div className="flex flex-col items-center gap-1">
-                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-tighter leading-none">{colorScheme === 'payments' ? 'Kantor SAMSAT' : 'Kecamatan'}</span>
-                  <span className="text-sm font-black text-slate-800 leading-none">{marker.name}</span>
-                  <div className="w-full h-[1px] bg-slate-100 my-1" />
-                  <span className={`text-xs font-black ${accentColor} leading-none`}>{formatCurrencyShort(marker.value)}</span>
-                  {marker.count && (
-                    <span className={`text-[10px] font-bold ${accentColor} opacity-75 mt-0.5 leading-none`}>{formatNumber(marker.count)} Unit</span>
-                  )}
-                </div>
-              </Tooltip>
-              <Popup eventHandlers={{ remove: () => setActivePopup(null) }}>
-                <div className="p-4 min-w-[200px] bg-white rounded-2xl space-y-3">
-                    <div className="border-b border-slate-50 pb-2">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{colorScheme === 'payments' ? 'Kantor Pembayaran Pajak' : 'Detail Wilayah (Kecamatan)'}</p>
-                      <h4 className={`text-lg font-black ${accentColor} leading-tight uppercase`}>{marker.name}</h4>
-                    </div>
-                    <div className={`${accentBg} p-3 rounded-xl space-y-2`}>
-                      <div>
-                        <p className={`text-[10px] font-bold ${valueColor} uppercase tracking-wider mb-1 opacity-70`}>{metricLabel}</p>
-                        <p className={`text-xl font-black ${valueColor}`}>{formatCurrencyShort(marker.value)}</p>
+                <Tooltip 
+                  permanent={false} 
+                  direction="top" 
+                  sticky={true}
+                  className="bg-white/95 border border-slate-200 shadow-xl rounded-xl p-2 px-3 backdrop-blur-md"
+                >
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-tighter leading-none">{colorScheme === 'payments' ? 'Kantor SAMSAT' : 'Kecamatan'}</span>
+                    <span className="text-sm font-black text-slate-800 leading-none">{marker.name}</span>
+                    <div className="w-full h-[1px] bg-slate-100 my-1" />
+                    <span className={`text-xs font-black ${accentColor} leading-none`}>{formatCurrencyShort(marker.value)}</span>
+                    {marker.count && (
+                      <span className={`text-[10px] font-bold ${accentColor} opacity-75 mt-0.5 leading-none`}>{formatNumber(marker.count)} Unit</span>
+                    )}
+                  </div>
+                </Tooltip>
+                <Popup eventHandlers={{ remove: () => setActivePopup(null) }}>
+                  <div className="p-4 min-w-[200px] bg-white rounded-2xl space-y-3">
+                      <div className="border-b border-slate-50 pb-2">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{colorScheme === 'payments' ? 'Kantor Pembayaran Pajak' : 'Detail Wilayah (Kecamatan)'}</p>
+                        <h4 className={`text-lg font-black ${accentColor} leading-tight uppercase`}>{marker.name}</h4>
                       </div>
-                      {marker.count && (
-                        <div className="pt-2 mt-2 border-t border-emerald-200/50">
-                          <p className={`text-[10px] font-bold ${valueColor} uppercase tracking-wider mb-0.5 opacity-70`}>Total Kendaraan</p>
-                          <p className={`text-sm font-black ${valueColor}`}>{formatNumber(marker.count)} Unit</p>
+                      <div className={`${accentBg} p-3 rounded-xl space-y-2`}>
+                        <div>
+                          <p className={`text-[10px] font-bold ${valueColor} uppercase tracking-wider mb-1 opacity-70`}>{metricLabel}</p>
+                          <p className={`text-xl font-black ${valueColor}`}>{formatCurrencyShort(marker.value)}</p>
                         </div>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-slate-400 italic">{colorScheme === 'payments' ? `Total PKB dan data kendaraan yang terkumpul melalui ${marker.name}.` : `Data tunggakan di wilayah ${marker.name}.`}</p>
-                </div>
-              </Popup>
-            </Marker>
+                        {marker.count && (
+                          <div className="pt-2 mt-2 border-t border-emerald-200/50">
+                            <p className={`text-[10px] font-bold ${valueColor} uppercase tracking-wider mb-0.5 opacity-70`}>Total Kendaraan</p>
+                            <p className={`text-sm font-black ${valueColor}`}>{formatNumber(marker.count)} Unit</p>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-400 italic">{colorScheme === 'payments' ? `Total PKB dan data kendaraan yang terkumpul melalui ${marker.name}.` : `Data tunggakan di wilayah ${marker.name}.`}</p>
+                  </div>
+                </Popup>
+              </Circle>
+
+              {/* Visible label */}
+              <Marker 
+                position={marker.position} 
+                interactive={false}
+                icon={L.divIcon({ 
+                  className: 'bg-transparent', 
+                  iconSize: [0, 0],
+                  html: `<div class="p-1 px-2 ${markerBg} text-white text-[9px] font-bold rounded shadow-lg border whitespace-nowrap -translate-x-1/2 -translate-y-full pointer-events-none">${marker.name}</div>`
+                })}
+              />
+            </div>
           ))}
         </MapContainer>
 
