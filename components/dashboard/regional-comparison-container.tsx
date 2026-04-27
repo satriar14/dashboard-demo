@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import { motion } from "framer-motion";
 import { ChartCardSkeleton } from "./skeleton-loader";
-import { getCitySummary, getKabupatenSummary, DashboardFilters } from "@/lib/api-actions";
+import { getCitySummary, getKabupatenSummary, getRiskTimeSeries, DashboardFilters } from "@/lib/api-actions";
 import { COLORS, CHART_PALETTE, formatNumber, formatNumberShort, formatCurrencyShort } from "@/lib/data";
 
 interface RegionalComparisonContainerProps {
@@ -17,6 +17,7 @@ interface RegionalComparisonContainerProps {
 export function RegionalComparisonContainer({ filters }: RegionalComparisonContainerProps) {
   const [cityData, setCityData] = useState<any[]>([]);
   const [kabupatenData, setKabupatenData] = useState<any[]>([]);
+  const [riskTrendData, setRiskTrendData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -26,9 +27,11 @@ export function RegionalComparisonContainer({ filters }: RegionalComparisonConta
         // Sequentialize queries to prevent shared memory pressure
         const cRes = await getCitySummary(filters);
         const kRes = await getKabupatenSummary(filters);
+        const rRes = await getRiskTimeSeries(filters);
         
         setCityData(cRes);
         setKabupatenData(kRes);
+        setRiskTrendData(rRes);
       } catch (error) {
         console.error("Failed to fetch regional comparison data:", error);
       } finally {
@@ -220,57 +223,51 @@ export function RegionalComparisonContainer({ filters }: RegionalComparisonConta
         </Card>
       </motion.div>
 
-      {/* Distribusi Risiko */}
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.5 }}>
-        <Card className="h-full border-slate-200/60 shadow-sm overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Matriks Distribusi Risiko</CardTitle>
+        <Card className="h-full border-slate-200/60 shadow-sm overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-rose-50/30 to-transparent" />
+          <CardHeader className="relative z-10 flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Tren Risiko Nominal (Time Series)</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="relative z-10">
             <div className="h-64 mt-4 min-w-0 overflow-hidden">
-              {!isLoading && riskData.length > 0 && (
+              {!isLoading && riskTrendData.length > 0 && (
                 <ResponsiveContainer width="100%" height="100%">
-                  <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: -20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <AreaChart data={riskTrendData} margin={{ top: 20, right: 30, left: -20, bottom: 20 }}>
+                    <defs>
+                      <linearGradient id="colorRiskTrend" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.danger} stopOpacity={0.15}/>
+                        <stop offset="95%" stopColor={COLORS.danger} stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis 
-                      type="number" 
-                      dataKey="impact" 
-                      name="Impact" 
-                      unit="%" 
-                      label={{ value: 'Impact', position: 'insideBottom', offset: -10, fontSize: 10, fill: '#64748b' }}
-                      tick={{ fontSize: 10 }}
-                      domain={[0, 100]}
+                      dataKey="x" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: '500' }} 
                     />
                     <YAxis 
-                      type="number" 
-                      dataKey="probability" 
-                      name="Probability" 
-                      unit="%" 
-                      label={{ value: 'Probability', angle: -90, position: 'insideLeft', fontSize: 10, fill: '#64748b' }}
-                      tick={{ fontSize: 10 }}
-                      domain={[0, 100]}
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 10, fill: '#64748b' }}
+                      tickFormatter={(v) => `${v}jt`}
                     />
                     <Tooltip 
-                      cursor={{ strokeDasharray: '3 3' }}
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          return (
-                            <div className="bg-white p-3 border border-slate-200 shadow-xl rounded-xl text-[13px]">
-                              <p className="font-bold text-indigo-600 mb-1">{data.name}</p>
-                              <div className="space-y-1 text-slate-600">
-                                <p>Impact: <span className="font-bold text-slate-900">{data.impact}%</span></p>
-                                <p>Probabilitas: <span className="font-bold text-slate-900">{data.probability}%</span></p>
-                                <p>Tunggakan: <span className="font-bold text-rose-600">{formatCurrencyShort(data.tunggakan)}</span></p>
-                              </div>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
+                      contentStyle={{ backgroundColor: '#fff', border: 'none', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }}
+                      itemStyle={{ fontSize: '12px', color: COLORS.danger, fontWeight: 'bold' }}
+                      formatter={(v: any) => formatCurrencyShort(Number(v))}
                     />
-                    <Scatter data={riskData} fill={COLORS.primary} fillOpacity={0.6} />
-                  </ScatterChart>
+                    <Area 
+                      name="Nominal Risiko"
+                      type="monotone" 
+                      dataKey="value" 
+                      stroke={COLORS.danger} 
+                      fill="url(#colorRiskTrend)" 
+                      strokeWidth={3} 
+                      dot={{ r: 4, fill: COLORS.danger, strokeWidth: 2, stroke: '#fff' }}
+                    />
+                  </AreaChart>
                 </ResponsiveContainer>
               )}
             </div>

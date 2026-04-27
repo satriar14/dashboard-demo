@@ -326,7 +326,7 @@ export function TransactionTable({ data, currentPage, totalCount, onPageChange }
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto scrollbar-visible">
             <Table>
               <TableHeader className="bg-slate-50/50">
                 <TableRow>

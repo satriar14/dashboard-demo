@@ -464,27 +464,42 @@ export async function getForecastData(filters: DashboardFilters) {
 export async function getKecamatanForecastSeries(filters: DashboardFilters) {
   const { text: filterClause, values } = getFilterClause(filters);
 
-  // Get aggregated data by date and kecamatan
+  // 1. Get total volume per kecamatan first to find Top 5
+  const topKecQuery = `
+    SELECT 
+      nama_kec, 
+      SUM(${SQL_NUMERIC_CAST('pokok_pkb')}) as total_vol
+    FROM v_data_transaksi_kendaraan
+    ${filterClause} ${filterClause ? 'AND' : 'WHERE'} nama_kec IS NOT NULL
+    GROUP BY nama_kec
+    ORDER BY total_vol DESC
+    LIMIT 5
+  `;
+  const { rows: topKecRows } = await serialQuery(topKecQuery, values);
+  const topKecNames = topKecRows.map(r => r.nama_kec);
+
+  if (topKecNames.length === 0) return { data: [], kecamatanList: [] };
+
+  // 2. Get aggregated data for these Top 5 kecamatan
   const query = `
     SELECT 
       COALESCE(paid_on::text, masa_pajak_sampai::text) as raw_date,
       nama_kec as kecamatan,
       SUM(${SQL_NUMERIC_CAST('pokok_pkb')} / 1000000) as total_val
     FROM v_data_transaksi_kendaraan
-    ${filterClause} ${filterClause ? 'AND' : 'WHERE'} COALESCE(paid_on::text, masa_pajak_sampai::text) IS NOT NULL AND nama_kec IS NOT NULL
-    GROUP BY COALESCE(paid_on::text, masa_pajak_sampai::text), nama_kec
+    ${filterClause} ${filterClause ? 'AND' : 'WHERE'} 
+      COALESCE(paid_on::text, masa_pajak_sampai::text) IS NOT NULL 
+      AND nama_kec = ANY($${values.length + 1})
+    GROUP BY raw_date, nama_kec
   `;
 
-  const { rows } = await serialQuery(query, values);
+  const { rows } = await serialQuery(query, [...values, topKecNames]);
   
   const pivot: Record<string, Record<string, number>> = {};
-  const kecamatanSet = new Set<string>();
-
   rows.forEach(row => {
     const rawDate = row.raw_date;
-    if (!rawDate) return;
-    
     let year = NaN, month = NaN;
+
     if (rawDate.includes('/')) {
       const parts = rawDate.split('/');
       if (parts.length >= 3) {
@@ -508,18 +523,15 @@ export async function getKecamatanForecastSeries(filters: DashboardFilters) {
       const monthKey = `${year}-${month.toString().padStart(2, '0')}`;
       if (!pivot[monthKey]) pivot[monthKey] = {};
       pivot[monthKey][row.kecamatan] = (pivot[monthKey][row.kecamatan] || 0) + parseFloat(row.total_val || 0);
-      kecamatanSet.add(row.kecamatan);
     }
   });
 
-  const kecamatanList = Array.from(kecamatanSet).sort();
   const sortedMonthKeys = Object.keys(pivot).sort();
-  
-  if (sortedMonthKeys.length === 0) return { data: [], kecamatanList: [] };
+  if (sortedMonthKeys.length === 0) return { data: [], kecamatanList: topKecNames };
 
-  const forecasts: Record<string, { m: number, c: number, n: number }> = {};
-  
-  kecamatanList.forEach(kec => {
+  // 3. Calculate Linear Regression for each Top 5 Kecamatan
+  const forecasts: Record<string, { m: number, c: number }> = {};
+  topKecNames.forEach(kec => {
     const values = sortedMonthKeys.map(k => pivot[k][kec] || 0);
     const n = values.length;
     let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
@@ -532,43 +544,45 @@ export async function getKecamatanForecastSeries(filters: DashboardFilters) {
     const divisor = (n * sumXX - sumX * sumX);
     const m = divisor !== 0 ? (n * sumXY - sumX * sumY) / divisor : 0;
     const c = (sumY - m * sumX) / n;
-    forecasts[kec] = { m, c, n };
+    forecasts[kec] = { m, c };
   });
 
+  // 4. Build results (Historical)
   const result: any[] = sortedMonthKeys.map((k, index) => {
     const [year, month] = k.split('-');
     const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-    const monthName = date.toLocaleString('en-US', { month: 'short', year: '2-digit' });
+    const monthName = date.toLocaleString('id-ID', { month: 'short', year: '2-digit' });
     const entry: any = { x: monthName, isForecast: false };
-    kecamatanList.forEach(kec => {
-      entry[kec] = Math.round((pivot[k][kec] || 0) * 1000) / 1000;
+    topKecNames.forEach(kec => {
+      entry[kec] = Math.round((pivot[k][kec] || 0) * 100) / 100;
     });
     return entry;
   });
 
+  // 5. Add 3 Months Forecast
   const lastIndex = sortedMonthKeys.length - 1;
   const lastMonthKey = sortedMonthKeys[lastIndex];
-  const lastYear = parseInt(lastMonthKey.split('-')[0]);
-  const lastMonth = parseInt(lastMonthKey.split('-')[1]);
+  const [lastYear, lastMonth] = lastMonthKey.split('-').map(Number);
 
   for (let i = 1; i <= 3; i++) {
     const projDate = new Date(lastYear, lastMonth + i - 1, 1);
-    const projMonthName = projDate.toLocaleString('en-US', { month: 'short', year: '2-digit' });
+    const projMonthName = projDate.toLocaleString('id-ID', { month: 'short', year: '2-digit' });
     const entry: any = { x: projMonthName, isForecast: true };
     
-    kecamatanList.forEach(kec => {
+    topKecNames.forEach(kec => {
       const { m, c } = forecasts[kec];
       const projectedValue = m * (lastIndex + i) + c;
-      entry[kec] = Math.round(Math.max(0, projectedValue) * 1000) / 1000;
+      entry[kec] = Math.round(Math.max(0, projectedValue) * 100) / 100;
     });
     result.push(entry);
   }
 
   return {
     data: result,
-    kecamatanList
+    kecamatanList: topKecNames
   };
 }
+
 
 export async function getPaymentHeatmapData(filters: DashboardFilters): Promise<HeatmapPoint[]> {
   const { text: filterClause, values } = getFilterClause(filters);
@@ -670,4 +684,56 @@ export async function getArrearsDaysDistribution(filters: DashboardFilters): Pro
     value: row.value,
     sort_order: row.sort_order
   }));
+}
+export async function getRiskTimeSeries(filters: DashboardFilters) {
+  const { text: filterClause, values } = getFilterClause(filters);
+  const query = `
+    SELECT 
+      COALESCE(paid_on::text, masa_pajak_sampai::text) as raw_date,
+      SUM(${SQL_TOTAL_DENDA} / 1000000) as value
+    FROM v_data_transaksi_kendaraan
+    ${filterClause} ${filterClause ? 'AND' : 'WHERE'} COALESCE(paid_on::text, masa_pajak_sampai::text) IS NOT NULL
+    GROUP BY raw_date
+    ORDER BY raw_date ASC
+  `;
+  const { rows } = await serialQuery(query, values);
+  
+  const monthlyData: Record<string, number> = {};
+  rows.forEach(row => {
+    const rawDate = row.raw_date;
+    let year = NaN, month = NaN;
+
+    if (rawDate.includes('/')) {
+      const parts = rawDate.split('/');
+      if (parts.length >= 3) {
+        month = parseInt(parts[1], 10);
+        year = parseInt(parts[2], 10);
+      }
+    } else if (rawDate.includes('-')) {
+      const parts = rawDate.split('-');
+      if (parts.length >= 2) {
+        if (parts[0].length === 4) {
+          year = parseInt(parts[0], 10);
+          month = parseInt(parts[1], 10);
+        } else {
+          month = parseInt(parts[1], 10);
+          year = parseInt(parts[2], 10);
+        }
+      }
+    }
+
+    if (!isNaN(year) && !isNaN(month)) {
+      const monthKey = `${year}-${month.toString().padStart(2, '0')}`;
+      monthlyData[monthKey] = (monthlyData[monthKey] || 0) + parseFloat(row.total_val || row.value || 0);
+    }
+  });
+
+  return Object.keys(monthlyData).sort().map(k => {
+    const [year, month] = k.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+    return {
+      x: date.toLocaleString('id-ID', { month: 'short', year: '2-digit' }),
+      value: Math.round(monthlyData[k] * 100) / 100
+    };
+  });
 }
