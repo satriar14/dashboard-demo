@@ -2,7 +2,7 @@
 
 import { CityData, DetailedData, ArrearsByYear, ArrearsByLocation, HeatmapPoint, ArrearsDaysDist } from "./data";
 import { getCoords } from "./coordinates";
-import { pool } from "./db";
+import { serialQuery } from "./db";
 import { 
   getFilterClause, 
   SQL_NUMERIC_CAST, 
@@ -29,7 +29,22 @@ export async function getDashboardStats(filters: DashboardFilters) {
 
   const statsQuery = `
     SELECT 
-      SUM(${SQL_NUMERIC_CAST('pokok_pkb')} + ${SQL_NUMERIC_CAST('opsen_pokok_pkb')}) as total_potensi_val,
+      SUM(
+        ${SQL_NUMERIC_CAST('pokok_pkb')} +
+        ${SQL_NUMERIC_CAST('pokok_bbnkb')} +
+        ${SQL_NUMERIC_CAST('tunggakan_pokok_pkb')} +
+        ${SQL_NUMERIC_CAST('tunggakan_pokok_bbnkb')} +
+        ${SQL_NUMERIC_CAST('opsen_pokok_pkb')} +
+        ${SQL_NUMERIC_CAST('opsen_tunggakan_pokok_pkb')} +
+        ${SQL_NUMERIC_CAST('opsen_pokok_bbnkb')} +
+        ${SQL_NUMERIC_CAST('opsen_tunggakan_pokok_bbnkb')}
+      ) as total_potensi_pkb_val,
+      SUM(
+        ${SQL_NUMERIC_CAST('pokok_swdkllj')} +
+        ${SQL_NUMERIC_CAST('tunggakan_pokok_swdkllj')} +
+        ${SQL_NUMERIC_CAST('denda_swdkllj')} +
+        ${SQL_NUMERIC_CAST('tunggakan_denda_swdkllj')}
+      ) as total_potensi_swdkllj_val,
       SUM(${SQL_TOTAL_DENDA}) as total_tunggakan_val,
       AVG(
         CASE 
@@ -44,7 +59,7 @@ export async function getDashboardStats(filters: DashboardFilters) {
 
   const labelsQuery = `
     SELECT 
-      COALESCE(customer_labelling, 'Unlabelled') as name,
+      COALESCE(segment_perilaku, 'Unlabelled') as name,
       COUNT(*)::int as value
     FROM v_data_transaksi_kendaraan
     ${filterClause}
@@ -52,22 +67,26 @@ export async function getDashboardStats(filters: DashboardFilters) {
     ORDER BY value DESC
   `;
 
-  const { rows: statsRows } = await pool.query(statsQuery, [...values, now]);
-  const { rows: labelRows } = await pool.query(labelsQuery, values);
+  const { rows: statsRows } = await serialQuery(statsQuery, [...values, now]);
+  const { rows: labelRows } = await serialQuery(labelsQuery, values);
 
   const row = statsRows[0];
-  const totalPotensiVal = parseFloat(row.total_potensi_val || 0);
+  const totalPotensiPkbVal = parseFloat(row.total_potensi_pkb_val || 0);
+  const totalPotensiSwdklljVal = parseFloat(row.total_potensi_swdkllj_val || 0);
   const totalTunggakanVal = parseFloat(row.total_tunggakan_val || 0);
   
-  const totalPotensi = totalPotensiVal / 1000000;
+  const totalPotensiPkb = totalPotensiPkbVal / 1000000;
+  const totalPotensiSwdkllj = totalPotensiSwdklljVal / 1000000;
   const totalTunggakan = totalTunggakanVal / 1000000;
   
-  const kepatuhan = totalPotensiVal > 0 
-    ? (((totalPotensiVal - totalTunggakanVal) / totalPotensiVal) * 100).toFixed(1) 
+  const combinedPotensi = totalPotensiPkbVal + totalPotensiSwdklljVal;
+  const kepatuhan = combinedPotensi > 0 
+    ? (((combinedPotensi - totalTunggakanVal) / combinedPotensi) * 100).toFixed(1) 
     : "0";
 
   return {
-    totalPotensi,
+    totalPotensiPkb,
+    totalPotensiSwdkllj,
     totalTunggakan,
     avgDelay: Math.round(parseFloat(row.avg_delay_val || 0)),
     kepatuhan,
@@ -99,7 +118,7 @@ export async function getCitySummary(filters: DashboardFilters): Promise<CityDat
     ORDER BY potensi DESC
   `;
 
-  const { rows } = await pool.query(query, [...values, now]);
+  const { rows } = await serialQuery(query, [...values, now]);
 
   return rows.map(row => ({
     name: row.group_name,
@@ -126,7 +145,7 @@ export async function getKabupatenSummary(filters: DashboardFilters): Promise<Ci
     ORDER BY potensi DESC
   `;
 
-  const { rows } = await pool.query(query, values);
+  const { rows } = await serialQuery(query, values);
 
   return rows.map(row => ({
     name: row.group_name,
@@ -145,7 +164,7 @@ export async function getTransactions(filters: DashboardFilters, page: number = 
 
   const query = `
     SELECT 
-      nopol, nomor_polisi, upt_nama, paid_on, masa_pajak_sampai,
+      nopol, upt_nama, paid_on, masa_pajak_sampai,
       ${SQL_NUMERIC_CAST('pokok_pkb')} as pokok,
       ${SQL_TOTAL_DENDA} as denda,
       ${SQL_NUMERIC_CAST('opsen_pokok_pkb')} as opsen,
@@ -153,17 +172,17 @@ export async function getTransactions(filters: DashboardFilters, page: number = 
       tahun_buat, bbm, warna_plat, nomor_mesin, nomor_rangka, nik, no_hp,
       nama_kabkota, nama_kec, nama_kel,
       pokok_bbnkb, opsen_pokok_bbnkb, pokok_swdkllj, denda_swdkllj,
-      ai_reminder, customer_labelling, next_best_action
+      ai_recommendation as ai_reminder, segment_perilaku as customer_labelling, strategi_perilaku as next_best_action
     FROM v_data_transaksi_kendaraan
     ${filterClause}
     ORDER BY COALESCE(paid_on::text, masa_pajak_sampai::text) DESC NULLS LAST
     LIMIT $${values.length + 1} OFFSET $${values.length + 2}
   `;
 
-  const { rows } = await pool.query(query, [...values, limit, offset]);
+  const { rows } = await serialQuery(query, [...values, limit, offset]);
 
   return rows.map((row, i) => {
-    const nopol = row.nopol || row.nomor_polisi || '';
+    const nopol = row.nopol || '';
     return {
       id: (nopol || 'ID') + '-' + (offset + i),
       samsat: row.upt_nama || row.nama_kabkota || 'N/A',
@@ -213,33 +232,33 @@ export async function getTransactions(filters: DashboardFilters, page: number = 
 export async function getTotalTransactions(filters: DashboardFilters): Promise<number> {
   const { text: filterClause, values } = getFilterClause(filters);
   const query = `SELECT COUNT(*) FROM v_data_transaksi_kendaraan ${filterClause}`;
-  const { rows } = await pool.query(query, values);
+  const { rows } = await serialQuery(query, values);
   return parseInt(rows[0].count);
 }
 
 export async function getKabupatenOptions() {
   const query = `SELECT DISTINCT nama_kabkota FROM v_data_transaksi_kendaraan WHERE nama_kabkota IS NOT NULL ORDER BY nama_kabkota`;
-  const { rows } = await pool.query(query);
+  const { rows } = await serialQuery(query);
   return rows.map(r => r.nama_kabkota);
 }
 
 export async function getKecamatanOptions(kabupaten: string) {
   if (!kabupaten || kabupaten === 'Semua') return [];
   const query = `SELECT DISTINCT nama_kec FROM v_data_transaksi_kendaraan WHERE nama_kabkota = $1 AND nama_kec IS NOT NULL ORDER BY nama_kec`;
-  const { rows } = await pool.query(query, [kabupaten]);
+  const { rows } = await serialQuery(query, [kabupaten]);
   return rows.map(r => r.nama_kec);
 }
 
 export async function getDesaOptions(kecamatan: string) {
   if (!kecamatan || kecamatan === 'Semua') return [];
   const query = `SELECT DISTINCT nama_kel FROM v_data_transaksi_kendaraan WHERE nama_kec = $1 AND nama_kel IS NOT NULL ORDER BY nama_kel`;
-  const { rows } = await pool.query(query, [kecamatan]);
+  const { rows } = await serialQuery(query, [kecamatan]);
   return rows.map(r => r.nama_kel);
 }
 
 export async function getJenisKendaraanOptions() {
   const query = `SELECT DISTINCT jenis_kendaraan FROM v_data_transaksi_kendaraan WHERE jenis_kendaraan IS NOT NULL ORDER BY jenis_kendaraan`;
-  const { rows } = await pool.query(query);
+  const { rows } = await serialQuery(query);
   return rows.map(r => r.jenis_kendaraan);
 }
 
@@ -250,13 +269,13 @@ export async function getYearOptions() {
     WHERE COALESCE(paid_on::text, masa_pajak_sampai::text) IS NOT NULL 
     ORDER BY year DESC
   `;
-  const { rows } = await pool.query(query);
+  const { rows } = await serialQuery(query);
   return rows.map(r => r.year);
 }
 
 export async function getGolonganOptions() {
   const query = `SELECT DISTINCT warna_plat FROM v_data_transaksi_kendaraan WHERE warna_plat IS NOT NULL AND warna_plat != '' ORDER BY warna_plat`;
-  const { rows } = await pool.query(query);
+  const { rows } = await serialQuery(query);
   return rows.map(r => r.warna_plat);
 }
 
@@ -273,7 +292,7 @@ export async function getArrearsByProdYear(filters: DashboardFilters): Promise<A
     ORDER BY tahun_buat DESC
   `;
 
-  const { rows } = await pool.query(query, values);
+  const { rows } = await serialQuery(query, values);
 
   return rows.map(row => ({
     tahun_buat: row.tahun_buat,
@@ -301,7 +320,7 @@ export async function getArrearsByLocation(filters: DashboardFilters): Promise<A
     LIMIT 10
   `;
 
-  const { rows } = await pool.query(query, values);
+  const { rows } = await serialQuery(query, values);
 
   return rows.map(row => ({
     name: row.group_name,
@@ -322,7 +341,7 @@ export async function getHeatmapData(filters: DashboardFilters): Promise<Heatmap
     GROUP BY group_name, parent_name
   `;
 
-  const { rows } = await pool.query(query, values);
+  const { rows } = await serialQuery(query, values);
 
   return rows.map(row => {
     const coords = getCoords(row.group_name, row.parent_name);
@@ -340,22 +359,55 @@ export async function getForecastData(filters: DashboardFilters) {
 
   const query = `
     SELECT 
-      LEFT(COALESCE(paid_on::text, masa_pajak_sampai::text), 7) as month_key,
+      COALESCE(paid_on::text, masa_pajak_sampai::text) as raw_date,
       SUM(${SQL_NUMERIC_CAST('pokok_pkb')} / 1000000) as total_val
     FROM v_data_transaksi_kendaraan
     ${filterClause} ${filterClause ? 'AND' : 'WHERE'} COALESCE(paid_on::text, masa_pajak_sampai::text) IS NOT NULL
-    GROUP BY LEFT(COALESCE(paid_on::text, masa_pajak_sampai::text), 7)
-    ORDER BY month_key ASC
+    GROUP BY COALESCE(paid_on::text, masa_pajak_sampai::text)
   `;
 
-  const { rows } = await pool.query(query, values);
+  const { rows } = await serialQuery(query, values);
 
-  const sortedMonths = rows.map(row => {
-    const [year, month] = row.month_key.split('-');
-    const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-    const name = date.toLocaleString('en-US', { month: 'short', year: '2-digit' });
-    return { name, value: parseFloat(row.total_val || 0), sort: parseInt(year) * 100 + parseInt(month) };
+  const monthlyData: Record<string, number> = {};
+
+  rows.forEach(row => {
+    const rawDate = row.raw_date;
+    if (!rawDate) return;
+    
+    let year = NaN, month = NaN;
+    if (rawDate.includes('/')) {
+      const parts = rawDate.split('/');
+      if (parts.length >= 3) {
+        month = parseInt(parts[1], 10);
+        year = parseInt(parts[2], 10);
+      }
+    } else if (rawDate.includes('-')) {
+      const parts = rawDate.split('-');
+      if (parts.length >= 2) {
+        if (parts[0].length === 4) {
+          year = parseInt(parts[0], 10);
+          month = parseInt(parts[1], 10);
+        } else {
+          month = parseInt(parts[1], 10);
+          year = parseInt(parts[2], 10);
+        }
+      }
+    }
+
+    if (!isNaN(year) && !isNaN(month)) {
+      const monthKey = `${year}-${month.toString().padStart(2, '0')}`;
+      monthlyData[monthKey] = (monthlyData[monthKey] || 0) + parseFloat(row.total_val || 0);
+    }
   });
+
+  const sortedMonths = Object.entries(monthlyData)
+    .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+    .map(([key, val]) => {
+      const [year, month] = key.split('-');
+      const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+      const name = date.toLocaleString('en-US', { month: 'short', year: '2-digit' });
+      return { name, value: val, sort: parseInt(year) * 100 + parseInt(month) };
+    });
 
   if (sortedMonths.length === 0) return [];
 
@@ -403,30 +455,58 @@ export async function getForecastData(filters: DashboardFilters) {
 export async function getKecamatanForecastSeries(filters: DashboardFilters) {
   const { text: filterClause, values } = getFilterClause(filters);
 
-  // Get aggregated data by month and kecamatan
+  // Get aggregated data by date and kecamatan
   const query = `
     SELECT 
-      LEFT(COALESCE(paid_on::text, masa_pajak_sampai::text), 7) as month_key,
+      COALESCE(paid_on::text, masa_pajak_sampai::text) as raw_date,
       nama_kec as kecamatan,
       SUM(${SQL_NUMERIC_CAST('pokok_pkb')} / 1000000) as total_val
     FROM v_data_transaksi_kendaraan
     ${filterClause} ${filterClause ? 'AND' : 'WHERE'} COALESCE(paid_on::text, masa_pajak_sampai::text) IS NOT NULL AND nama_kec IS NOT NULL
-    GROUP BY LEFT(COALESCE(paid_on::text, masa_pajak_sampai::text), 7), nama_kec
-    ORDER BY month_key ASC
+    GROUP BY COALESCE(paid_on::text, masa_pajak_sampai::text), nama_kec
   `;
 
-  const { rows } = await pool.query(query, values);
+  const { rows } = await serialQuery(query, values);
   
-  const kecamatanList = Array.from(new Set(rows.map(r => r.kecamatan))).sort() as string[];
-  const sortedMonthKeys = Array.from(new Set(rows.map(r => r.month_key))).sort();
+  const pivot: Record<string, Record<string, number>> = {};
+  const kecamatanSet = new Set<string>();
+
+  rows.forEach(row => {
+    const rawDate = row.raw_date;
+    if (!rawDate) return;
+    
+    let year = NaN, month = NaN;
+    if (rawDate.includes('/')) {
+      const parts = rawDate.split('/');
+      if (parts.length >= 3) {
+        month = parseInt(parts[1], 10);
+        year = parseInt(parts[2], 10);
+      }
+    } else if (rawDate.includes('-')) {
+      const parts = rawDate.split('-');
+      if (parts.length >= 2) {
+        if (parts[0].length === 4) {
+          year = parseInt(parts[0], 10);
+          month = parseInt(parts[1], 10);
+        } else {
+          month = parseInt(parts[1], 10);
+          year = parseInt(parts[2], 10);
+        }
+      }
+    }
+
+    if (!isNaN(year) && !isNaN(month)) {
+      const monthKey = `${year}-${month.toString().padStart(2, '0')}`;
+      if (!pivot[monthKey]) pivot[monthKey] = {};
+      pivot[monthKey][row.kecamatan] = (pivot[monthKey][row.kecamatan] || 0) + parseFloat(row.total_val || 0);
+      kecamatanSet.add(row.kecamatan);
+    }
+  });
+
+  const kecamatanList = Array.from(kecamatanSet).sort();
+  const sortedMonthKeys = Object.keys(pivot).sort();
   
   if (sortedMonthKeys.length === 0) return { data: [], kecamatanList: [] };
-
-  const pivot: Record<string, Record<string, number>> = {};
-  rows.forEach(row => {
-    if (!pivot[row.month_key]) pivot[row.month_key] = {};
-    pivot[row.month_key][row.kecamatan] = parseFloat(row.total_val || 0);
-  });
 
   const forecasts: Record<string, { m: number, c: number, n: number }> = {};
   
@@ -495,7 +575,7 @@ export async function getPaymentHeatmapData(filters: DashboardFilters): Promise<
     HAVING SUM(${SQL_NUMERIC_CAST('pokok_pkb')}) > 0
   `;
 
-  const { rows } = await pool.query(query, values);
+  const { rows } = await serialQuery(query, values);
 
   return rows.map(row => {
     const coords = getCoords(row.group_name);
@@ -520,7 +600,7 @@ export async function getBapendaSummary(filters: DashboardFilters) {
     ORDER BY value DESC
     LIMIT 10
   `;
-  const { rows } = await pool.query(query, values);
+  const { rows } = await serialQuery(query, values);
   return rows.map(r => ({ name: r.name, value: parseFloat(r.value || 0) }));
 }
 
@@ -536,7 +616,7 @@ export async function getJRSummary(filters: DashboardFilters) {
     ORDER BY value DESC
     LIMIT 10
   `;
-  const { rows } = await pool.query(query, values);
+  const { rows } = await serialQuery(query, values);
   return rows.map(r => ({ name: r.name, value: parseFloat(r.value || 0) }));
 }
 
@@ -574,7 +654,7 @@ export async function getArrearsDaysDistribution(filters: DashboardFilters): Pro
     ORDER BY sort_order ASC
   `;
 
-  const { rows } = await pool.query(query, values);
+  const { rows } = await serialQuery(query, values);
 
   return rows.map(row => ({
     category: row.category,

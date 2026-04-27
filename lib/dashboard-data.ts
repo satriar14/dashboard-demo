@@ -1,5 +1,5 @@
 import { DetailedData } from './data';
-import { pool } from './db';
+import { serialQuery } from './db';
 
 // Permanent in-memory cache — data is static, parse once and reuse forever
 let cachedData: DetailedData[] | null = null;
@@ -7,7 +7,6 @@ let cachedData: DetailedData[] | null = null;
 interface DbRow {
   // Identifikasi Kendaraan
   nopol: string | null;
-  nomor_polisi: string | null;
   id_layanan: string | null;
   nama_layanan: string | null;
   // Wilayah
@@ -59,9 +58,9 @@ interface DbRow {
   nama_kec: string | null;
   nama_kel: string | null;
   // AI Fields
-  ai_reminder: string | null;
-  customer_labelling: string | null;
-  next_best_action: string | null;
+  ai_recommendation: string | null;
+  segment_perilaku: string | null;
+  strategi_perilaku: string | null;
 }
 
 export async function getDashboardData(): Promise<DetailedData[]> {
@@ -72,9 +71,9 @@ export async function getDashboardData(): Promise<DetailedData[]> {
 
   try {
     console.time('[Dashboard] DB Query');
-    const { rows } = await pool.query<DbRow>(`
+    const { rows } = await serialQuery<DbRow>(`
       SELECT 
-        nopol, nomor_polisi, id_layanan, nama_layanan,
+        nopol, id_layanan, nama_layanan,
         kabupaten_id, nama_kabupaten, upt_id, upt_nama,
         paid_on, masa_pajak_mulai, masa_pajak_sampai,
         pokok_pkb, tunggakan_pokok_pkb, pokok_bbnkb, tunggakan_pokok_bbnkb,
@@ -85,7 +84,7 @@ export async function getDashboardData(): Promise<DetailedData[]> {
         warna_plat_id, warna_plat, fungsi_id, fungsi,
         nama_pemilik, nik, no_hp,
         nama_kabkota, nama_kec, nama_kel,
-        ai_reminder, customer_labelling, next_best_action
+        ai_recommendation, segment_perilaku, strategi_perilaku
       FROM v_data_transaksi_kendaraan
     `);
     console.timeEnd('[Dashboard] DB Query');
@@ -93,7 +92,7 @@ export async function getDashboardData(): Promise<DetailedData[]> {
     console.time('[Dashboard] Data mapping');
     const mappedData: DetailedData[] = rows.map((row, i) => {
       // nopol is the primary plate number; nomor_polisi is the full formatted one
-      const nopol = row.nopol || row.nomor_polisi || '';
+      const nopol = row.nopol || '';
       const paidOn = row.paid_on || '';
       const masaPajak = row.masa_pajak_sampai || '';
       const kabupaten = row.nama_kabkota || row.nama_kabupaten || 'N/A';
@@ -159,9 +158,9 @@ export async function getDashboardData(): Promise<DetailedData[]> {
         masa_pajak_sampai: masaPajak,
 
         // AI Fields
-        ai_reminder: row.ai_reminder || '',
-        customer_labelling: row.customer_labelling || '',
-        next_best_action: row.next_best_action || '',
+        ai_reminder: row.ai_recommendation || '',
+        customer_labelling: row.segment_perilaku || '',
+        next_best_action: row.strategi_perilaku || '',
       };
     });
     console.timeEnd('[Dashboard] Data mapping');

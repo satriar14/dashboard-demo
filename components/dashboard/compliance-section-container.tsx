@@ -38,22 +38,37 @@ export function ComplianceSectionContainer({ filters }: ComplianceSectionContain
   const getColor = (name: string, index: number) => {
     const label = name.toLowerCase();
     
-    // Explicit mappings for common labels with premium colors
-    if (label.includes('patuh') || label.includes('loyal') || label.includes('highly')) return '#6366f1'; // Indigo Premium
-    if (label.includes('kurang') || label.includes('risk') || label.includes('at risk')) return '#f59e0b'; // Vibrant Amber
-    if (label.includes('tidak') || label.includes('critical') || label.includes('danger')) return '#f43f5e'; // Deep Rose/Red
-    if (label.includes('unlabelled') || label.includes('lainnya')) return '#94a3b8'; // Cool Slate
+    // Explicit mappings for common labels with requested colors
+    if (label.includes('tidak patuh kronis')) return '#ef4444'; // Merah
+    if (label.includes('patuh')) return '#10b981'; // Hijau
+    if (label.includes('lupa') || label.includes('sibuk')) return '#eab308'; // Kuning
+    if (label.includes('potensi lalai')) return '#f97316'; // Orange
+    if (label.includes('unknown') || label.includes('unlabelled')) return '#94a3b8'; // Abu
     
     // Vibrant Fallback Palette for other dynamic labels
     const palette = [
       '#8b5cf6', // Violet
       '#06b6d4', // Cyan
       '#ec4899', // Pink
-      '#10b981', // Emerald
-      '#f97316', // Orange
       '#3b82f6'  // Blue
     ];
     return palette[index % palette.length];
+  };
+
+  // Custom label to show percentage inside slices
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+    // Only show label if percentage is at least 3% to avoid overlap on small slices
+    if (percent < 0.03) return null;
+    
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * Math.PI / 180);
+    const y = cy + radius * Math.sin(-midAngle * Math.PI / 180);
+
+    return (
+      <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize="10" fontWeight="bold" style={{ pointerEvents: 'none' }}>
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
   };
 
   if (isLoading) {
@@ -82,6 +97,7 @@ export function ComplianceSectionContainer({ filters }: ComplianceSectionContain
                   paddingAngle={8} 
                   dataKey="value"
                   labelLine={false}
+                  label={renderCustomizedLabel}
                   animationBegin={0}
                   animationDuration={1000}
                 >
@@ -90,7 +106,11 @@ export function ComplianceSectionContainer({ filters }: ComplianceSectionContain
                   ))}
                 </Pie>
                 <Tooltip 
-                  formatter={(v: any) => formatNumber(Number(v))}
+                  formatter={(v: any, name: any, props: any) => {
+                    const percent = props?.payload?.percent;
+                    const percentText = percent ? ` (${(percent * 100).toFixed(1)}%)` : '';
+                    return `${formatNumber(Number(v))}${percentText}`;
+                  }}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.08)', fontSize: '14px' }} 
                 />
               </PieChart>

@@ -50,7 +50,7 @@ export function getFilterClause(filters: DashboardFilters): { text: string; valu
   if (filters.search) {
     const searchVal = `%${filters.search.toLowerCase()}%`;
     conditions.push(`(
-      LOWER(nomor_polisi) LIKE $${paramIdx} OR 
+      LOWER(nopol) LIKE $${paramIdx} OR 
       LOWER(nama_pemilik) LIKE $${paramIdx} OR 
       LOWER(upt_nama) LIKE $${paramIdx}
     )`);

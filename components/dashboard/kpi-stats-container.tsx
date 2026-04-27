@@ -33,7 +33,8 @@ export function KpiStatsContainer({ filters }: KpiStatsContainerProps) {
 
   if (isLoading || !stats) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+        <KPICardSkeleton />
         <KPICardSkeleton />
         <KPICardSkeleton />
         <KPICardSkeleton />
@@ -43,14 +44,22 @@ export function KpiStatsContainer({ filters }: KpiStatsContainerProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
       <KPICard 
-        title="Total Potensi" 
-        value={formatCurrencyShort(stats.totalPotensi)} 
+        title="Total Potensi PKB" 
+        value={formatCurrencyShort(stats.totalPotensiPkb)} 
         trend={12} 
         icon={DollarSign} 
         iconColor="indigo" 
         delay={0.1} 
+      />
+      <KPICard 
+        title="Total Potensi SWDKLLJ" 
+        value={formatCurrencyShort(stats.totalPotensiSwdkllj)} 
+        trend={8} 
+        icon={DollarSign} 
+        iconColor="blue" 
+        delay={0.15} 
       />
       <KPICard 
         title="Total Tunggakan" 
