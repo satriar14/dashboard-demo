@@ -80,6 +80,12 @@ export type DetailedData = {
   ai_reminder?: string;
   customer_labelling?: string;
   next_best_action?: string;
+  // Extended AI Fields
+  segment?: string;
+  ai_recommendation?: string;
+  segment_wilayah?: string;
+  segment_perilaku?: string;
+  strategi_perilaku?: string;
 };
 
 export type ArrearsByYear = {

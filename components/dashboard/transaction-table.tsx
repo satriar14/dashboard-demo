@@ -56,6 +56,13 @@ function TransactionDetailModal({
     transaction.kabupaten
   ].filter(Boolean).join(', ');
 
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return "-";
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr || "-"; // Fallback to raw string if possible
+    return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       <motion.div 
@@ -123,7 +130,7 @@ function TransactionDetailModal({
                   <Calendar size={14} />
                   <span className="text-[9px] font-bold uppercase tracking-wider">Tanggal Bayar</span>
                 </div>
-                <p className="text-xs font-bold text-slate-800">{new Date(transaction.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                <p className="text-xs font-bold text-slate-800">{formatDate(transaction.date)}</p>
             </div>
             <div className="space-y-1 p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
                 <div className="flex items-center gap-2 text-slate-400 mb-1">
@@ -181,26 +188,43 @@ function TransactionDetailModal({
                <h4 className="text-xs font-bold uppercase tracking-wider">AI Insight & Rekomendasi</h4>
             </div>
             <div className="grid grid-cols-1 gap-3">
-               <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50 space-y-2">
+                <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50 space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="bg-white p-1.5 rounded-lg shadow-sm">
                       <Activity size={14} className="text-indigo-600" />
                     </div>
-                    <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">AI Reminder</p>
+                    <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">AI Insight & Segmentation</p>
                   </div>
-                  <p className="text-sm font-semibold text-slate-800 leading-relaxed">
-                    {transaction.ai_reminder || 'Tidak ada pengingat khusus saat ini.'}
-                  </p>
+                  <div className="grid grid-cols-1 gap-2 border-t border-indigo-100/30 pt-2 mt-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">Segmen</span>
+                      <Badge className="bg-indigo-600 text-white border-none text-[9px] uppercase h-5 px-2">{transaction.segment || 'General'}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">Wilayah</span>
+                      <span className="text-[10px] font-black text-slate-700 uppercase">{transaction.segment_wilayah || 'N/A'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">Perilaku</span>
+                      <span className="text-[10px] font-black text-slate-700 uppercase">{transaction.segment_perilaku || 'N/A'}</span>
+                    </div>
+                  </div>
+                  <div className="bg-white/50 p-2 rounded-lg mt-2 border border-indigo-100/50">
+                    <p className="text-[8px] font-bold text-indigo-400 uppercase mb-1">Rekomendasi AI</p>
+                    <p className="text-xs font-bold text-slate-700 leading-tight">
+                      {transaction.ai_recommendation || 'Analisis AI sedang diproses...'}
+                    </p>
+                  </div>
                </div>
                <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100/50 space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="bg-white p-1.5 rounded-lg shadow-sm">
                       <Sparkles size={14} className="text-emerald-600" />
                     </div>
-                    <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Next Best Action</p>
+                    <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Strategi Penanganan</p>
                   </div>
-                  <p className="text-sm font-semibold text-slate-800 leading-relaxed">
-                    {transaction.next_best_action || 'Lanjutkan pemantauan rutin.'}
+                  <p className="text-sm font-bold text-slate-800 leading-relaxed">
+                    {transaction.strategi_perilaku || 'Gunakan strategi standar.'}
                   </p>
                </div>
             </div>
@@ -311,6 +335,10 @@ export function TransactionTable({ data, currentPage, totalCount, onPageChange }
                   <TableHead className="font-bold uppercase text-[10px] tracking-widest">NOPOL</TableHead>
                   <TableHead className="font-bold uppercase text-[10px] tracking-widest w-[300px]">Pemilik & Alamat</TableHead>
                   <TableHead className="font-bold uppercase text-[10px] tracking-widest">Pokok PKB</TableHead>
+                  <TableHead className="font-bold uppercase text-[10px] tracking-widest">Pokok SWDKLLJ</TableHead>
+                  <TableHead className="font-bold uppercase text-[10px] tracking-widest">Segment</TableHead>
+                  <TableHead className="font-bold uppercase text-[10px] tracking-widest">Wilayah</TableHead>
+                  <TableHead className="font-bold uppercase text-[10px] tracking-widest">Perilaku</TableHead>
                   <TableHead className="font-bold uppercase text-[10px] tracking-widest text-center">Status</TableHead>
                   <TableHead className="font-bold uppercase text-[10px] tracking-widest min-w-[200px]">Next Best Action</TableHead>
                   <TableHead className="font-bold uppercase text-[10px] tracking-widest text-right">Aksi</TableHead>
@@ -339,6 +367,10 @@ export function TransactionTable({ data, currentPage, totalCount, onPageChange }
                         </div>
                       </TableCell>
                       <TableCell className="text-sm font-bold text-slate-700">Rp {formatNumber(row.pokok)}</TableCell>
+                      <TableCell className="text-sm font-bold text-slate-700">Rp {formatNumber(row.swdkllj || 0)}</TableCell>
+                      <TableCell className="text-xs font-bold text-indigo-600 uppercase">{row.segment || '-'}</TableCell>
+                      <TableCell className="text-[10px] font-bold text-slate-500 uppercase">{row.segment_wilayah || '-'}</TableCell>
+                      <TableCell className="text-[10px] font-bold text-slate-500 uppercase">{row.segment_perilaku || '-'}</TableCell>
                       <TableCell className="text-center">
                         <Badge 
                           variant="secondary"
@@ -379,7 +411,7 @@ export function TransactionTable({ data, currentPage, totalCount, onPageChange }
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-32 text-center text-slate-400 italic">
+                    <TableCell colSpan={12} className="h-32 text-center text-slate-400 italic">
                       Tidak ada data ditemukan.
                     </TableCell>
                   </TableRow>

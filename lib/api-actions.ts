@@ -25,7 +25,6 @@ export type DashboardFilters = {
 
 export async function getDashboardStats(filters: DashboardFilters) {
   const { text: filterClause, values } = getFilterClause(filters);
-  const now = new Date().toISOString();
 
   const statsQuery = `
     SELECT 
@@ -48,11 +47,12 @@ export async function getDashboardStats(filters: DashboardFilters) {
       SUM(${SQL_TOTAL_DENDA}) as total_tunggakan_val,
       AVG(
         CASE 
-          WHEN ${SQL_TOTAL_DENDA} > 0 AND masa_pajak_sampai IS NOT NULL AND masa_pajak_sampai::date < $${values.length + 1}::date
-          THEN ($${values.length + 1}::date - masa_pajak_sampai::date)
+          WHEN hari_tunggakan > 0 THEN hari_tunggakan
           ELSE NULL 
         END
-      ) as avg_delay_val
+      ) as avg_delay_val,
+      COUNT(*) as total_count,
+      COUNT(CASE WHEN hari_tunggakan <= 0 THEN 1 END) as patuh_count
     FROM v_data_transaksi_kendaraan
     ${filterClause}
   `;
@@ -67,7 +67,7 @@ export async function getDashboardStats(filters: DashboardFilters) {
     ORDER BY value DESC
   `;
 
-  const { rows: statsRows } = await serialQuery(statsQuery, [...values, now]);
+  const { rows: statsRows } = await serialQuery(statsQuery, values);
   const { rows: labelRows } = await serialQuery(labelsQuery, values);
 
   const row = statsRows[0];
@@ -79,9 +79,11 @@ export async function getDashboardStats(filters: DashboardFilters) {
   const totalPotensiSwdkllj = totalPotensiSwdklljVal / 1000000;
   const totalTunggakan = totalTunggakanVal / 1000000;
   
-  const combinedPotensi = totalPotensiPkbVal + totalPotensiSwdklljVal;
-  const kepatuhan = combinedPotensi > 0 
-    ? (((combinedPotensi - totalTunggakanVal) / combinedPotensi) * 100).toFixed(1) 
+  // Kepatuhan = persentase kendaraan yang tepat waktu (hari_tunggakan <= 0)
+  const totalCount = parseInt(row.total_count || 0);
+  const patuhCount = parseInt(row.patuh_count || 0);
+  const kepatuhan = totalCount > 0 
+    ? ((patuhCount / totalCount) * 100).toFixed(1) 
     : "0";
 
   return {
@@ -96,7 +98,6 @@ export async function getDashboardStats(filters: DashboardFilters) {
 
 export async function getCitySummary(filters: DashboardFilters): Promise<CityData[]> {
   const { text: filterClause, values } = getFilterClause(filters);
-  const now = new Date().toISOString();
 
   // Group by kecamatan for city summary
   const query = `
@@ -107,8 +108,7 @@ export async function getCitySummary(filters: DashboardFilters): Promise<CityDat
       SUM((${SQL_NUMERIC_CAST('pokok_pkb')} + ${SQL_NUMERIC_CAST('opsen_pokok_pkb')}) / 1000000) as potensi,
       AVG(
         CASE 
-          WHEN ${SQL_TOTAL_DENDA} > 0 AND masa_pajak_sampai IS NOT NULL AND masa_pajak_sampai::date < $${values.length + 1}::date
-          THEN ($${values.length + 1}::date - masa_pajak_sampai::date)
+          WHEN hari_tunggakan > 0 THEN hari_tunggakan
           ELSE NULL 
         END
       ) as avg_delay
@@ -118,7 +118,7 @@ export async function getCitySummary(filters: DashboardFilters): Promise<CityDat
     ORDER BY potensi DESC
   `;
 
-  const { rows } = await serialQuery(query, [...values, now]);
+  const { rows } = await serialQuery(query, values);
 
   return rows.map(row => ({
     name: row.group_name,
@@ -172,7 +172,7 @@ export async function getTransactions(filters: DashboardFilters, page: number = 
       tahun_buat, bbm, warna_plat, nomor_mesin, nomor_rangka, nik, no_hp,
       nama_kabkota, nama_kec, nama_kel,
       pokok_bbnkb, opsen_pokok_bbnkb, pokok_swdkllj, denda_swdkllj,
-      ai_recommendation as ai_reminder, segment_perilaku as customer_labelling, strategi_perilaku as next_best_action
+      segment, ai_recommendation, segment_wilayah, segment_perilaku, strategi_perilaku
     FROM v_data_transaksi_kendaraan
     ${filterClause}
     ORDER BY COALESCE(paid_on::text, masa_pajak_sampai::text) DESC NULLS LAST
@@ -221,10 +221,17 @@ export async function getTransactions(filters: DashboardFilters, page: number = 
       kabupaten: row.nama_kabkota || 'N/A',
       masa_pajak_sampai: row.masa_pajak_sampai || '',
 
-      // AI Fields
-      ai_reminder: row.ai_reminder || '',
-      customer_labelling: row.customer_labelling || '',
-      next_best_action: row.next_best_action || '',
+      // AI Fields (Backward compatible)
+      ai_reminder: row.ai_recommendation || '',
+      customer_labelling: row.segment_perilaku || '',
+      next_best_action: row.strategi_perilaku || '',
+      
+      // AI Fields (Direct)
+      segment: row.segment || '',
+      ai_recommendation: row.ai_recommendation || '',
+      segment_wilayah: row.segment_wilayah || '',
+      segment_perilaku: row.segment_perilaku || '',
+      strategi_perilaku: row.strategi_perilaku || '',
     };
   });
 }
@@ -335,6 +342,7 @@ export async function getHeatmapData(filters: DashboardFilters): Promise<Heatmap
     SELECT 
       COALESCE(nama_kec, 'TIDAK TERIDENTIFIKASI') as group_name,
       nama_kabkota as parent_name,
+      MAX(COALESCE(jumlah_penunggak_kecamatan, 0)) as count,
       SUM(${SQL_TOTAL_DENDA} / 1000000) as total_value
     FROM v_data_transaksi_kendaraan
     ${filterClause} ${filterClause ? 'AND' : 'WHERE'} ${SQL_TOTAL_DENDA} > 0
@@ -349,7 +357,8 @@ export async function getHeatmapData(filters: DashboardFilters): Promise<Heatmap
       name: row.group_name,
       lat: coords.lat,
       lng: coords.lng,
-      value: parseFloat(row.total_value || 0)
+      value: parseFloat(row.total_value || 0),
+      count: parseInt(row.count || 0)
     };
   });
 }
