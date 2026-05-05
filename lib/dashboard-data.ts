@@ -35,6 +35,8 @@ interface DbRow {
   tunggakan_pokok_swdkllj: string | null;
   denda_swdkllj: string | null;
   tunggakan_denda_swdkllj: string | null;
+  // Pre-computed total
+  total_denda: string | null;
   // Detail Kendaraan
   kode_jenken: string | null;
   jenis_kendaraan: string | null;
@@ -76,9 +78,13 @@ export async function getDashboardData(): Promise<DetailedData[]> {
         nopol, id_layanan, nama_layanan,
         kabupaten_id, nama_kabupaten, upt_id, upt_nama,
         paid_on, masa_pajak_mulai, masa_pajak_sampai,
-        pokok_pkb, tunggakan_pokok_pkb, pokok_bbnkb, tunggakan_pokok_bbnkb,
-        opsen_pokok_pkb, opsen_tunggakan_pokok_pkb, opsen_pokok_bbnkb, opsen_tunggakan_pokok_bbnkb,
-        pokok_swdkllj, tunggakan_pokok_swdkllj, denda_swdkllj, tunggakan_denda_swdkllj,
+        pokok_pkb_num as pokok_pkb, tunggakan_pokok_pkb_num as tunggakan_pokok_pkb, 
+        pokok_bbnkb_num as pokok_bbnkb, tunggakan_pokok_bbnkb_num as tunggakan_pokok_bbnkb,
+        opsen_pokok_pkb_num as opsen_pokok_pkb, opsen_tunggakan_pokok_pkb_num as opsen_tunggakan_pokok_pkb, 
+        opsen_pokok_bbnkb_num as opsen_pokok_bbnkb, opsen_tunggakan_pokok_bbnkb_num as opsen_tunggakan_pokok_bbnkb,
+        pokok_swdkllj_num as pokok_swdkllj, tunggakan_pokok_swdkllj_num as tunggakan_pokok_swdkllj, 
+        denda_swdkllj_num as denda_swdkllj, tunggakan_denda_swdkllj_num as tunggakan_denda_swdkllj,
+        total_denda,
         kode_jenken, jenis_kendaraan, merk_kendaraan, tipe_kendaraan, cc,
         nomor_rangka, nomor_mesin, bbm, tahun_buat,
         warna_plat_id, warna_plat, fungsi_id, fungsi,
@@ -97,27 +103,11 @@ export async function getDashboardData(): Promise<DetailedData[]> {
       const masaPajak = row.masa_pajak_sampai || '';
       const kabupaten = row.nama_kabkota || row.nama_kabupaten || 'N/A';
 
-      // Helper to parse numeric strings
-      const parseNum = (val: string | null) => val ? parseFloat(val.replace(/,/g, '')) || 0 : 0;
+      // MV columns are already numeric, just parse them
+      const parseNum = (val: string | null) => val ? parseFloat(String(val).replace(/,/g, '')) || 0 : 0;
 
-      const tunggakanPkb = parseNum(row.tunggakan_pokok_pkb);
-      const tunggakanBbnkb = parseNum(row.tunggakan_pokok_bbnkb);
-      const opsenTunggakanPkb = parseNum(row.opsen_tunggakan_pokok_pkb);
-      const opsenTunggakanBbnkb = parseNum(row.opsen_tunggakan_pokok_bbnkb);
-      const tunggakanPokokSwdkllj = parseNum(row.tunggakan_pokok_swdkllj);
-      const dendaSwdkllj = parseNum(row.denda_swdkllj);
-      const tunggakanDendaSwdkllj = parseNum(row.tunggakan_denda_swdkllj);
-
-      // Calculate denda total from all tunggakan + denda fields
-      const dendaTotal = (
-        tunggakanPkb +
-        tunggakanBbnkb +
-        opsenTunggakanPkb +
-        opsenTunggakanBbnkb +
-        tunggakanPokokSwdkllj +
-        dendaSwdkllj +
-        tunggakanDendaSwdkllj
-      );
+      // Use pre-computed total_denda from MV
+      const dendaTotal = parseFloat(String(row.total_denda || 0));
 
       return {
         id: (nopol || 'ID') + '-' + i,
@@ -149,7 +139,7 @@ export async function getDashboardData(): Promise<DetailedData[]> {
         bbnkb: parseNum(row.pokok_bbnkb),
         opsen_bbnkb: parseNum(row.opsen_pokok_bbnkb),
         swdkllj: parseNum(row.pokok_swdkllj),
-        denda_swdkllj: dendaSwdkllj,
+        denda_swdkllj: parseNum(row.denda_swdkllj),
 
         // Detail Alamat
         kecamatan: row.nama_kec || '',

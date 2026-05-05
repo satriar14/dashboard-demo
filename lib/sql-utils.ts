@@ -64,17 +64,17 @@ export function getFilterClause(filters: DashboardFilters): { text: string; valu
   return { text: queryText, values };
 }
 
-// Cast column to numeric and handle non-numeric characters
-export const SQL_NUMERIC_CAST = (col: string) => `COALESCE(NULLIF(REPLACE(${col}, ',', ''), '')::numeric, 0)`;
+// For MV: columns are already numeric with _num suffix, no CAST needed
+export const SQL_NUMERIC_CAST = (col: string) => `${col}_num`;
 
 // Calculate delay in months/days for fines
-export const SQL_MONTHS_DELAYED = `GREATEST(0, (EXTRACT(YEAR FROM age(CURRENT_DATE, masa_pajak_sampai::date)) * 12 + EXTRACT(MONTH FROM age(CURRENT_DATE, masa_pajak_sampai::date))))`;
-export const SQL_DAYS_DELAYED = `GREATEST(0, (CURRENT_DATE - masa_pajak_sampai::date))`;
+export const SQL_MONTHS_DELAYED = `GREATEST(0, (EXTRACT(YEAR FROM age(CURRENT_DATE, masa_pajak_sampai)) * 12 + EXTRACT(MONTH FROM age(CURRENT_DATE, masa_pajak_sampai))))`;
+export const SQL_DAYS_DELAYED = `GREATEST(0, (CURRENT_DATE - masa_pajak_sampai))`;
 
 // Bapenda Denda Rate: 1% per month + 1% (max 24%)
 export const SQL_BAPENDA_DENDA_RATE = `
   CASE 
-    WHEN masa_pajak_sampai::date < CURRENT_DATE 
+    WHEN masa_pajak_sampai < CURRENT_DATE 
     THEN LEAST(0.24, (${SQL_MONTHS_DELAYED} + 1) * 0.01)
     ELSE 0 
   END
@@ -101,48 +101,41 @@ export const SQL_JR_POKOK = `
     WHEN kode_jenken = 'F' THEN 163000
     WHEN kode_jenken = 'G' THEN 276000
     WHEN kode_jenken = 'H' THEN 476000
-    ELSE ${SQL_NUMERIC_CAST('pokok_swdkllj')}
+    ELSE pokok_swdkllj_num
   END
 `;
 
 export const SQL_POTENSI_JR = `
   (${SQL_JR_POKOK} +
    (${SQL_JR_POKOK} * ${SQL_JR_DENDA_RATE}) +
-   ${SQL_NUMERIC_CAST('tunggakan_pokok_swdkllj')} +
-   ${SQL_NUMERIC_CAST('tunggakan_denda_swdkllj')})
+   tunggakan_pokok_swdkllj_num +
+   tunggakan_denda_swdkllj_num)
 `;
 
 // Formula for Bapenda Potensi (PKB & BBNKB)
-export const SQL_DENDA_PKB = `(${SQL_NUMERIC_CAST('pokok_pkb')} * ${SQL_BAPENDA_DENDA_RATE})`;
-export const SQL_DENDA_TUNGGAKAN_PKB = `(${SQL_NUMERIC_CAST('tunggakan_pokok_pkb')} * ${SQL_BAPENDA_DENDA_RATE})`;
-export const SQL_DENDA_BBNKB = `(${SQL_NUMERIC_CAST('pokok_bbnkb')} * ${SQL_BAPENDA_DENDA_RATE})`;
-export const SQL_DENDA_TUNGGAKAN_BBNKB = `(${SQL_NUMERIC_CAST('tunggakan_pokok_bbnkb')} * ${SQL_BAPENDA_DENDA_RATE})`;
+export const SQL_DENDA_PKB = `(pokok_pkb_num * ${SQL_BAPENDA_DENDA_RATE})`;
+export const SQL_DENDA_TUNGGAKAN_PKB = `(tunggakan_pokok_pkb_num * ${SQL_BAPENDA_DENDA_RATE})`;
+export const SQL_DENDA_BBNKB = `(pokok_bbnkb_num * ${SQL_BAPENDA_DENDA_RATE})`;
+export const SQL_DENDA_TUNGGAKAN_BBNKB = `(tunggakan_pokok_bbnkb_num * ${SQL_BAPENDA_DENDA_RATE})`;
 
 export const SQL_POTENSI_BAPENDA = `
-  (${SQL_NUMERIC_CAST('pokok_pkb')} + 
-   ${SQL_NUMERIC_CAST('tunggakan_pokok_pkb')} + 
+  (pokok_pkb_num + 
+   tunggakan_pokok_pkb_num + 
    ${SQL_DENDA_PKB} + 
    ${SQL_DENDA_TUNGGAKAN_PKB} + 
-   ${SQL_NUMERIC_CAST('opsen_pokok_pkb')} + 
-   ${SQL_NUMERIC_CAST('opsen_tunggakan_pokok_pkb')} + 
-   (${SQL_NUMERIC_CAST('opsen_pokok_pkb')} * ${SQL_BAPENDA_DENDA_RATE}) + 
-   (${SQL_NUMERIC_CAST('opsen_tunggakan_pokok_pkb')} * ${SQL_BAPENDA_DENDA_RATE}) + 
-   ${SQL_NUMERIC_CAST('pokok_bbnkb')} + 
-   ${SQL_NUMERIC_CAST('tunggakan_pokok_bbnkb')} + 
-   ${SQL_NUMERIC_CAST('opsen_pokok_bbnkb')} + 
-   ${SQL_NUMERIC_CAST('opsen_tunggakan_pokok_bbnkb')} + 
-   (${SQL_NUMERIC_CAST('opsen_pokok_bbnkb')} * ${SQL_BAPENDA_DENDA_RATE}) + 
-   (${SQL_NUMERIC_CAST('opsen_tunggakan_pokok_bbnkb')} * ${SQL_BAPENDA_DENDA_RATE}) + 
+   opsen_pokok_pkb_num + 
+   opsen_tunggakan_pokok_pkb_num + 
+   (opsen_pokok_pkb_num * ${SQL_BAPENDA_DENDA_RATE}) + 
+   (opsen_tunggakan_pokok_pkb_num * ${SQL_BAPENDA_DENDA_RATE}) + 
+   pokok_bbnkb_num + 
+   tunggakan_pokok_bbnkb_num + 
+   opsen_pokok_bbnkb_num + 
+   opsen_tunggakan_pokok_bbnkb_num + 
+   (opsen_pokok_bbnkb_num * ${SQL_BAPENDA_DENDA_RATE}) + 
+   (opsen_tunggakan_pokok_bbnkb_num * ${SQL_BAPENDA_DENDA_RATE}) + 
    ${SQL_DENDA_BBNKB} + 
    ${SQL_DENDA_TUNGGAKAN_BBNKB})
 `;
 
-export const SQL_TOTAL_DENDA = `
-  (${SQL_NUMERIC_CAST('tunggakan_pokok_pkb')} +
-   ${SQL_NUMERIC_CAST('tunggakan_pokok_bbnkb')} +
-   ${SQL_NUMERIC_CAST('opsen_tunggakan_pokok_pkb')} +
-   ${SQL_NUMERIC_CAST('opsen_tunggakan_pokok_bbnkb')} +
-   ${SQL_NUMERIC_CAST('tunggakan_pokok_swdkllj')} +
-   ${SQL_NUMERIC_CAST('denda_swdkllj')} +
-   ${SQL_NUMERIC_CAST('tunggakan_denda_swdkllj')})
-`;
+export const SQL_TOTAL_DENDA = `total_denda`;
+
