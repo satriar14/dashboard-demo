@@ -85,7 +85,7 @@ export async function getDashboardData(): Promise<DetailedData[]> {
         nama_pemilik, nik, no_hp,
         nama_kabkota, nama_kec, nama_kel,
         ai_recommendation, segment_perilaku, strategi_perilaku
-      FROM v_data_transaksi_kendaraan
+      FROM mv_dashboard_kendaraan
     `);
     console.timeEnd('[Dashboard] DB Query');
 

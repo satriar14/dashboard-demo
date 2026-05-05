@@ -48,3 +48,5 @@ next-env.d.ts
 
 # Generated data file (from CSV conversion)
 data_kendaraan.json
+
+*.sql

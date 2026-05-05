@@ -1,5 +1,8 @@
 import { DashboardFilters } from "./api-actions";
 
+// Materialized view table name - switch between MV and original view here
+export const MV_TABLE = 'mv_dashboard_kendaraan';
+
 export function getFilterClause(filters: DashboardFilters): { text: string; values: any[] } {
   const conditions: string[] = [];
   const values: any[] = [];
@@ -25,20 +28,19 @@ export function getFilterClause(filters: DashboardFilters): { text: string; valu
     values.push(filters.jenis);
   }
 
-  // Date Filters
+  // Date Filters - uses pre-computed columns from materialized view
   if (filters.year !== 'Semua') {
-    // Handling case where paid_on or masa_pajak_sampai is used
-    conditions.push(`(LEFT(COALESCE(paid_on::text, masa_pajak_sampai::text), 4) = $${paramIdx++})`);
+    conditions.push(`tahun_pajak = $${paramIdx++}`);
     values.push(filters.year);
   }
 
   if (filters.month !== 'Semua') {
-    conditions.push(`(SUBSTRING(COALESCE(paid_on::text, masa_pajak_sampai::text), 6, 2) = $${paramIdx++})`);
+    conditions.push(`bulan_pajak = $${paramIdx++}`);
     values.push(filters.month);
   }
 
   if (filters.day !== 'Semua') {
-    conditions.push(`(SUBSTRING(COALESCE(paid_on::text, masa_pajak_sampai::text), 9, 2) = $${paramIdx++})`);
+    conditions.push(`hari_pajak = $${paramIdx++}`);
     values.push(filters.day);
   }
 

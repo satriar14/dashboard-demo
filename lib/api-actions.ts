@@ -5,6 +5,7 @@ import { getCoords } from "./coordinates";
 import { serialQuery } from "./db";
 import { 
   getFilterClause, 
+  MV_TABLE,
   SQL_NUMERIC_CAST, 
   SQL_TOTAL_DENDA,
   SQL_POTENSI_BAPENDA,
@@ -28,23 +29,9 @@ export async function getDashboardStats(filters: DashboardFilters) {
 
   const statsQuery = `
     SELECT 
-      SUM(
-        ${SQL_NUMERIC_CAST('pokok_pkb')} +
-        ${SQL_NUMERIC_CAST('pokok_bbnkb')} +
-        ${SQL_NUMERIC_CAST('tunggakan_pokok_pkb')} +
-        ${SQL_NUMERIC_CAST('tunggakan_pokok_bbnkb')} +
-        ${SQL_NUMERIC_CAST('opsen_pokok_pkb')} +
-        ${SQL_NUMERIC_CAST('opsen_tunggakan_pokok_pkb')} +
-        ${SQL_NUMERIC_CAST('opsen_pokok_bbnkb')} +
-        ${SQL_NUMERIC_CAST('opsen_tunggakan_pokok_bbnkb')}
-      ) as total_potensi_pkb_val,
-      SUM(
-        ${SQL_NUMERIC_CAST('pokok_swdkllj')} +
-        ${SQL_NUMERIC_CAST('tunggakan_pokok_swdkllj')} +
-        ${SQL_NUMERIC_CAST('denda_swdkllj')} +
-        ${SQL_NUMERIC_CAST('tunggakan_denda_swdkllj')}
-      ) as total_potensi_swdkllj_val,
-      SUM(${SQL_TOTAL_DENDA}) as total_tunggakan_val,
+      SUM(total_potensi_pkb) as total_potensi_pkb_val,
+      SUM(total_potensi_swdkllj) as total_potensi_swdkllj_val,
+      SUM(total_denda) as total_tunggakan_val,
       AVG(
         CASE 
           WHEN hari_tunggakan > 0 THEN hari_tunggakan
@@ -53,7 +40,7 @@ export async function getDashboardStats(filters: DashboardFilters) {
       ) as avg_delay_val,
       COUNT(*) as total_count,
       COUNT(CASE WHEN hari_tunggakan <= 0 THEN 1 END) as patuh_count
-    FROM v_data_transaksi_kendaraan
+    FROM ${MV_TABLE}
     ${filterClause}
   `;
 
@@ -61,7 +48,7 @@ export async function getDashboardStats(filters: DashboardFilters) {
     SELECT 
       COALESCE(segment_perilaku, 'Unlabelled') as name,
       COUNT(*)::int as value
-    FROM v_data_transaksi_kendaraan
+    FROM ${MV_TABLE}
     ${filterClause}
     GROUP BY name
     ORDER BY value DESC
@@ -103,16 +90,16 @@ export async function getCitySummary(filters: DashboardFilters): Promise<CityDat
   const query = `
     SELECT 
       COALESCE(nama_kec, nama_kabkota, 'N/A') as group_name,
-      SUM(${SQL_NUMERIC_CAST('pokok_pkb')} / 1000000) as pkb,
-      SUM(${SQL_TOTAL_DENDA} / 1000000) as tunggakan,
-      SUM((${SQL_NUMERIC_CAST('pokok_pkb')} + ${SQL_NUMERIC_CAST('opsen_pokok_pkb')}) / 1000000) as potensi,
+      SUM(pokok_pkb_num / 1000000) as pkb,
+      SUM(total_denda / 1000000) as tunggakan,
+      SUM((pokok_pkb_num + opsen_pokok_pkb_num) / 1000000) as potensi,
       AVG(
         CASE 
           WHEN hari_tunggakan > 0 THEN hari_tunggakan
           ELSE NULL 
         END
       ) as avg_delay
-    FROM v_data_transaksi_kendaraan
+    FROM ${MV_TABLE}
     ${filterClause}
     GROUP BY group_name
     ORDER BY potensi DESC
@@ -136,10 +123,10 @@ export async function getKabupatenSummary(filters: DashboardFilters): Promise<Ci
   const query = `
     SELECT 
       COALESCE(nama_kabkota, 'N/A') as group_name,
-      SUM(${SQL_NUMERIC_CAST('pokok_pkb')} / 1000000) as pkb,
-      SUM(${SQL_TOTAL_DENDA} / 1000000) as tunggakan,
-      SUM((${SQL_NUMERIC_CAST('pokok_pkb')} + ${SQL_NUMERIC_CAST('opsen_pokok_pkb')}) / 1000000) as potensi
-    FROM v_data_transaksi_kendaraan
+      SUM(pokok_pkb_num / 1000000) as pkb,
+      SUM(total_denda / 1000000) as tunggakan,
+      SUM((pokok_pkb_num + opsen_pokok_pkb_num) / 1000000) as potensi
+    FROM ${MV_TABLE}
     ${filterClause}
     GROUP BY group_name
     ORDER BY potensi DESC
@@ -165,15 +152,16 @@ export async function getTransactions(filters: DashboardFilters, page: number = 
   const query = `
     SELECT 
       nopol, upt_nama, paid_on, masa_pajak_sampai,
-      ${SQL_NUMERIC_CAST('pokok_pkb')} as pokok,
-      ${SQL_TOTAL_DENDA} as denda,
-      ${SQL_NUMERIC_CAST('opsen_pokok_pkb')} as opsen,
+      pokok_pkb_num as pokok,
+      total_denda as denda,
+      opsen_pokok_pkb_num as opsen,
       nama_pemilik, jenis_kendaraan, merk_kendaraan, tipe_kendaraan, cc, fungsi,
       tahun_buat, bbm, warna_plat, nomor_mesin, nomor_rangka, nik, no_hp,
       nama_kabkota, nama_kec, nama_kel,
-      pokok_bbnkb, opsen_pokok_bbnkb, pokok_swdkllj, denda_swdkllj,
+      pokok_bbnkb_num as pokok_bbnkb, opsen_pokok_bbnkb_num as opsen_pokok_bbnkb, 
+      pokok_swdkllj_num as pokok_swdkllj, denda_swdkllj_num as denda_swdkllj,
       segment, ai_recommendation, segment_wilayah, segment_perilaku, strategi_perilaku
-    FROM v_data_transaksi_kendaraan
+    FROM ${MV_TABLE}
     ${filterClause}
     ORDER BY COALESCE(paid_on::text, masa_pajak_sampai::text) DESC NULLS LAST
     LIMIT $${values.length + 1} OFFSET $${values.length + 2}
@@ -238,42 +226,42 @@ export async function getTransactions(filters: DashboardFilters, page: number = 
 
 export async function getTotalTransactions(filters: DashboardFilters): Promise<number> {
   const { text: filterClause, values } = getFilterClause(filters);
-  const query = `SELECT COUNT(*) FROM v_data_transaksi_kendaraan ${filterClause}`;
+  const query = `SELECT COUNT(*) FROM ${MV_TABLE} ${filterClause}`;
   const { rows } = await serialQuery(query, values);
   return parseInt(rows[0].count);
 }
 
 export async function getKabupatenOptions() {
-  const query = `SELECT DISTINCT nama_kabkota FROM v_data_transaksi_kendaraan WHERE nama_kabkota IS NOT NULL ORDER BY nama_kabkota`;
+  const query = `SELECT DISTINCT nama_kabkota FROM ${MV_TABLE} WHERE nama_kabkota IS NOT NULL ORDER BY nama_kabkota`;
   const { rows } = await serialQuery(query);
   return rows.map(r => r.nama_kabkota);
 }
 
 export async function getKecamatanOptions(kabupaten: string) {
   if (!kabupaten || kabupaten === 'Semua') return [];
-  const query = `SELECT DISTINCT nama_kec FROM v_data_transaksi_kendaraan WHERE nama_kabkota = $1 AND nama_kec IS NOT NULL ORDER BY nama_kec`;
+  const query = `SELECT DISTINCT nama_kec FROM ${MV_TABLE} WHERE nama_kabkota = $1 AND nama_kec IS NOT NULL ORDER BY nama_kec`;
   const { rows } = await serialQuery(query, [kabupaten]);
   return rows.map(r => r.nama_kec);
 }
 
 export async function getDesaOptions(kecamatan: string) {
   if (!kecamatan || kecamatan === 'Semua') return [];
-  const query = `SELECT DISTINCT nama_kel FROM v_data_transaksi_kendaraan WHERE nama_kec = $1 AND nama_kel IS NOT NULL ORDER BY nama_kel`;
+  const query = `SELECT DISTINCT nama_kel FROM ${MV_TABLE} WHERE nama_kec = $1 AND nama_kel IS NOT NULL ORDER BY nama_kel`;
   const { rows } = await serialQuery(query, [kecamatan]);
   return rows.map(r => r.nama_kel);
 }
 
 export async function getJenisKendaraanOptions() {
-  const query = `SELECT DISTINCT jenis_kendaraan FROM v_data_transaksi_kendaraan WHERE jenis_kendaraan IS NOT NULL ORDER BY jenis_kendaraan`;
+  const query = `SELECT DISTINCT jenis_kendaraan FROM ${MV_TABLE} WHERE jenis_kendaraan IS NOT NULL ORDER BY jenis_kendaraan`;
   const { rows } = await serialQuery(query);
   return rows.map(r => r.jenis_kendaraan);
 }
 
 export async function getYearOptions() {
   const query = `
-    SELECT DISTINCT LEFT(COALESCE(paid_on::text, masa_pajak_sampai::text), 4) as year 
-    FROM v_data_transaksi_kendaraan 
-    WHERE COALESCE(paid_on::text, masa_pajak_sampai::text) IS NOT NULL 
+    SELECT DISTINCT tahun_pajak as year 
+    FROM ${MV_TABLE} 
+    WHERE tahun_pajak IS NOT NULL 
     ORDER BY year DESC
   `;
   const { rows } = await serialQuery(query);
@@ -281,7 +269,7 @@ export async function getYearOptions() {
 }
 
 export async function getGolonganOptions() {
-  const query = `SELECT DISTINCT warna_plat FROM v_data_transaksi_kendaraan WHERE warna_plat IS NOT NULL AND warna_plat != '' ORDER BY warna_plat`;
+  const query = `SELECT DISTINCT warna_plat FROM ${MV_TABLE} WHERE warna_plat IS NOT NULL AND warna_plat != '' ORDER BY warna_plat`;
   const { rows } = await serialQuery(query);
   return rows.map(r => r.warna_plat);
 }
@@ -293,8 +281,8 @@ export async function getArrearsByProdYear(filters: DashboardFilters): Promise<A
     SELECT 
       tahun_buat,
       COUNT(*) as tunggak
-    FROM v_data_transaksi_kendaraan
-    ${filterClause} ${filterClause ? 'AND' : 'WHERE'} ${SQL_TOTAL_DENDA} > 0 AND tahun_buat IS NOT NULL
+    FROM ${MV_TABLE}
+    ${filterClause} ${filterClause ? 'AND' : 'WHERE'} total_denda > 0 AND tahun_buat IS NOT NULL
     GROUP BY tahun_buat
     ORDER BY tahun_buat DESC
   `;
@@ -320,8 +308,8 @@ export async function getArrearsByLocation(filters: DashboardFilters): Promise<A
     SELECT 
       COALESCE(${groupCol}, 'TIDAK TERIDENTIFIKASI') as group_name,
       COUNT(*) as jumlah_kendaraan
-    FROM v_data_transaksi_kendaraan
-    ${filterClause} ${filterClause ? 'AND' : 'WHERE'} ${SQL_TOTAL_DENDA} > 0
+    FROM ${MV_TABLE}
+    ${filterClause} ${filterClause ? 'AND' : 'WHERE'} total_denda > 0
     GROUP BY group_name
     ORDER BY jumlah_kendaraan DESC
     LIMIT 10
@@ -343,9 +331,9 @@ export async function getHeatmapData(filters: DashboardFilters): Promise<Heatmap
       COALESCE(nama_kec, 'TIDAK TERIDENTIFIKASI') as group_name,
       nama_kabkota as parent_name,
       MAX(COALESCE(jumlah_penunggak_kecamatan, 0)) as count,
-      SUM(${SQL_TOTAL_DENDA} / 1000000) as total_value
-    FROM v_data_transaksi_kendaraan
-    ${filterClause} ${filterClause ? 'AND' : 'WHERE'} ${SQL_TOTAL_DENDA} > 0
+      SUM(total_denda / 1000000) as total_value
+    FROM ${MV_TABLE}
+    ${filterClause} ${filterClause ? 'AND' : 'WHERE'} total_denda > 0
     GROUP BY group_name, parent_name
   `;
 
@@ -369,8 +357,8 @@ export async function getForecastData(filters: DashboardFilters) {
   const query = `
     SELECT 
       COALESCE(paid_on::text, masa_pajak_sampai::text) as raw_date,
-      SUM(${SQL_NUMERIC_CAST('pokok_pkb')} / 1000000) as total_val
-    FROM v_data_transaksi_kendaraan
+      SUM(pokok_pkb_num / 1000000) as total_val
+    FROM ${MV_TABLE}
     ${filterClause} ${filterClause ? 'AND' : 'WHERE'} COALESCE(paid_on::text, masa_pajak_sampai::text) IS NOT NULL
     GROUP BY COALESCE(paid_on::text, masa_pajak_sampai::text)
   `;
@@ -468,8 +456,8 @@ export async function getKecamatanForecastSeries(filters: DashboardFilters) {
   const topKecQuery = `
     SELECT 
       nama_kec, 
-      SUM(${SQL_NUMERIC_CAST('pokok_pkb')}) as total_vol
-    FROM v_data_transaksi_kendaraan
+      SUM(pokok_pkb_num) as total_vol
+    FROM ${MV_TABLE}
     ${filterClause} ${filterClause ? 'AND' : 'WHERE'} nama_kec IS NOT NULL
     GROUP BY nama_kec
     ORDER BY total_vol DESC
@@ -485,8 +473,8 @@ export async function getKecamatanForecastSeries(filters: DashboardFilters) {
     SELECT 
       COALESCE(paid_on::text, masa_pajak_sampai::text) as raw_date,
       nama_kec as kecamatan,
-      SUM(${SQL_NUMERIC_CAST('pokok_pkb')} / 1000000) as total_val
-    FROM v_data_transaksi_kendaraan
+      SUM(pokok_pkb_num / 1000000) as total_val
+    FROM ${MV_TABLE}
     ${filterClause} ${filterClause ? 'AND' : 'WHERE'} 
       COALESCE(paid_on::text, masa_pajak_sampai::text) IS NOT NULL 
       AND nama_kec = ANY($${values.length + 1})
@@ -591,11 +579,11 @@ export async function getPaymentHeatmapData(filters: DashboardFilters): Promise<
     SELECT 
       COALESCE(upt_nama, nama_kabkota, 'TIDAK DIKETAHUI') as group_name,
       COUNT(*) as count,
-      SUM(${SQL_NUMERIC_CAST('pokok_pkb')} / 1000000) as total_pkb
-    FROM v_data_transaksi_kendaraan
+      SUM(pokok_pkb_num / 1000000) as total_pkb
+    FROM ${MV_TABLE}
     ${filterClause}
     GROUP BY group_name
-    HAVING SUM(${SQL_NUMERIC_CAST('pokok_pkb')}) > 0
+    HAVING SUM(pokok_pkb_num) > 0
   `;
 
   const { rows } = await serialQuery(query, values);
@@ -617,7 +605,7 @@ export async function getBapendaSummary(filters: DashboardFilters) {
     SELECT 
       nama_kabkota as name,
       SUM(${SQL_POTENSI_BAPENDA} / 1000000) as value
-    FROM v_data_transaksi_kendaraan
+    FROM ${MV_TABLE}
     ${filterClause}
     GROUP BY name
     ORDER BY value DESC
@@ -633,7 +621,7 @@ export async function getJRSummary(filters: DashboardFilters) {
     SELECT 
       nama_kabkota as name,
       SUM(${SQL_POTENSI_JR} / 1000000) as value
-    FROM v_data_transaksi_kendaraan
+    FROM ${MV_TABLE}
     ${filterClause}
     GROUP BY name
     ORDER BY value DESC
@@ -648,30 +636,10 @@ export async function getArrearsDaysDistribution(filters: DashboardFilters): Pro
   
   const query = `
     SELECT 
-      CASE 
-        WHEN hari_tunggakan < -90 THEN '> 90 Hari Awal'
-        WHEN hari_tunggakan < -30 THEN '31 - 90 Hari Awal'
-        WHEN hari_tunggakan < 0 THEN '1 - 30 Hari Awal'
-        WHEN hari_tunggakan = 0 THEN 'Tepat Waktu'
-        WHEN hari_tunggakan <= 365 THEN '1 Tahun Terlambat'
-        WHEN hari_tunggakan <= 730 THEN '2 Tahun Terlambat'
-        WHEN hari_tunggakan <= 1095 THEN '3 Tahun Terlambat'
-        WHEN hari_tunggakan <= 1460 THEN '4 Tahun Terlambat'
-        ELSE '> 4 Tahun Terlambat'
-      END as category,
-      CASE 
-        WHEN hari_tunggakan < -90 THEN 1
-        WHEN hari_tunggakan < -30 THEN 2
-        WHEN hari_tunggakan < 0 THEN 3
-        WHEN hari_tunggakan = 0 THEN 4
-        WHEN hari_tunggakan <= 365 THEN 5
-        WHEN hari_tunggakan <= 730 THEN 6
-        WHEN hari_tunggakan <= 1095 THEN 7
-        WHEN hari_tunggakan <= 1460 THEN 8
-        ELSE 9
-      END as sort_order,
+      kategori_tunggakan as category,
+      kategori_tunggakan_order as sort_order,
       COUNT(*)::int as value
-    FROM v_data_transaksi_kendaraan
+    FROM ${MV_TABLE}
     ${filterClause}
     GROUP BY category, sort_order
     ORDER BY sort_order ASC
@@ -690,8 +658,8 @@ export async function getRiskTimeSeries(filters: DashboardFilters) {
   const query = `
     SELECT 
       COALESCE(paid_on::text, masa_pajak_sampai::text) as raw_date,
-      SUM(${SQL_TOTAL_DENDA} / 1000000) as value
-    FROM v_data_transaksi_kendaraan
+      SUM(total_denda / 1000000) as value
+    FROM ${MV_TABLE}
     ${filterClause} ${filterClause ? 'AND' : 'WHERE'} COALESCE(paid_on::text, masa_pajak_sampai::text) IS NOT NULL
     GROUP BY raw_date
     ORDER BY raw_date ASC
