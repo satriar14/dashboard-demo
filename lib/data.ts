@@ -86,6 +86,15 @@ export type DetailedData = {
   segment_wilayah?: string;
   segment_perilaku?: string;
   strategi_perilaku?: string;
+  // Fields from v_tabel_detail
+  kode_upt?: string;
+  segmen_kepatuhan?: string;
+  segmen_nama?: string;
+  treatment_aksi_utama?: string;
+  treatment_kanal_utama?: string;
+  treatment_kebijakan_amnesti?: string;
+  treatment_perkiraan_konversi?: string;
+  usia_kendaraan?: number;
 };
 
 export type ArrearsByYear = {

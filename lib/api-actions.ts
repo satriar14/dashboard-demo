@@ -149,23 +149,30 @@ export async function getTransactions(filters: DashboardFilters, page: number = 
   const limit = 20;
   const offset = (page - 1) * limit;
 
+  // We use v_tabel_detail as the primary source for treatment and segmentation data
+  // but join with mv_dashboard_kendaraan (latest transaction per nopol) to get owner name and enable filtering
   const query = `
+    WITH filtered_mv AS (
+      SELECT DISTINCT ON (nopol) * 
+      FROM ${MV_TABLE}
+      ORDER BY nopol, COALESCE(paid_on::text, masa_pajak_sampai::text) DESC NULLS LAST
+    )
     SELECT 
-      nopol, upt_nama, paid_on, masa_pajak_sampai,
-      pokok_pkb_num as pokok,
-      total_denda as denda,
-      opsen_pokok_pkb_num as opsen,
-      nama_pemilik, jenis_kendaraan, merk_kendaraan, tipe_kendaraan, cc, fungsi,
-      tahun_buat, bbm, warna_plat, nomor_mesin, nomor_rangka, nik, no_hp,
-      nama_kabkota, nama_kec, nama_kel,
-      pokok_bbnkb_num as pokok_bbnkb, opsen_pokok_bbnkb_num as opsen_pokok_bbnkb, 
-      pokok_swdkllj_num as pokok_swdkllj, denda_swdkllj_num as denda_swdkllj,
-      segment, ai_recommendation, segment_wilayah, segment_perilaku, strategi_perilaku
-    FROM ${MV_TABLE}
-    ${filterClause}
-    ORDER BY COALESCE(paid_on::text, masa_pajak_sampai::text) DESC NULLS LAST
+      v.*,
+      mv.nama_pemilik, mv.paid_on, mv.masa_pajak_sampai,
+      mv.nama_kabkota, mv.nama_kec, mv.nama_kel,
+      mv.merk_kendaraan, mv.tipe_kendaraan, mv.tahun_buat as mv_tahun_buat,
+      mv.bbm, mv.warna_plat, mv.nomor_mesin, mv.nomor_rangka, mv.nik, mv.no_hp,
+      mv.cc, mv.fungsi
+    FROM v_tabel_detail v
+    LEFT JOIN filtered_mv mv ON v.nopol = mv.nopol
+    ${filterClause.replace(/WHERE /g, 'WHERE ')} 
+    ORDER BY v.nopol ASC
     LIMIT $${values.length + 1} OFFSET $${values.length + 2}
   `;
+
+  // Note: filterClause might refer to columns that are only in mv. 
+  // Since we are joining and selecting mv.*, the filterClause (e.g. "WHERE nama_kabkota = ...") will work.
 
   const { rows } = await serialQuery(query, [...values, limit, offset]);
 
@@ -173,22 +180,22 @@ export async function getTransactions(filters: DashboardFilters, page: number = 
     const nopol = row.nopol || '';
     return {
       id: (nopol || 'ID') + '-' + (offset + i),
-      samsat: row.upt_nama || row.nama_kabkota || 'N/A',
+      samsat: row.nama_upt || row.nama_kabkota || 'N/A',
       nopol,
-      pemilik: row.nama_pemilik || '',
-      alamat: [row.nama_kel, row.nama_kec, row.nama_kabkota].filter(Boolean).join(', '),
-      pokok: parseFloat(row.pokok || 0),
-      denda: parseFloat(row.denda || 0),
-      opsen: parseFloat(row.opsen || 0),
-      status: parseFloat(row.denda || 0) > 0 ? 'Tertunggak' : 'Lunas',
+      pemilik: row.nama || row.nama_pemilik || '',
+      alamat: row.alamat || [row.nama_kel, row.nama_kec, row.nama_kabkota].filter(Boolean).join(', '),
+      pokok: parseFloat(row.pokok_pkb || 0),
+      denda: 0, // Denda is not in v_tabel_detail directly
+      opsen: 0,
+      status: row.segmen_kepatuhan === 'Patuh' ? 'Lunas' : 'Tertunggak',
       date: row.paid_on || row.masa_pajak_sampai || '',
 
       // Detail Kendaraan
       merek: row.merk_kendaraan || '',
       tipe: row.tipe_kendaraan || '',
-      tahun_buat: row.tahun_buat || '',
+      tahun_buat: row.mv_tahun_buat || '',
       bahan_bakar: row.bbm || '',
-      jenis_kendaraan: row.jenis_kendaraan || '',
+      jenis_kendaraan: '', // Missing in v_tabel_detail image
       warna_plat: row.warna_plat || '',
       nomor_mesin: row.nomor_mesin || '',
       nomor_rangka: row.nomor_rangka || '',
@@ -198,10 +205,7 @@ export async function getTransactions(filters: DashboardFilters, page: number = 
       fungsi: row.fungsi || '',
 
       // Detail Pajak
-      bbnkb: parseFloat(row.pokok_bbnkb || 0),
-      opsen_bbnkb: parseFloat(row.opsen_pokok_bbnkb || 0),
       swdkllj: parseFloat(row.pokok_swdkllj || 0),
-      denda_swdkllj: parseFloat(row.denda_swdkllj || 0),
 
       // Detail Alamat
       kecamatan: row.nama_kec || '',
@@ -209,24 +213,39 @@ export async function getTransactions(filters: DashboardFilters, page: number = 
       kabupaten: row.nama_kabkota || 'N/A',
       masa_pajak_sampai: row.masa_pajak_sampai || '',
 
-      // AI Fields (Backward compatible)
-      ai_reminder: row.ai_recommendation || '',
-      customer_labelling: row.segment_perilaku || '',
-      next_best_action: row.strategi_perilaku || '',
-      
-      // AI Fields (Direct)
-      segment: row.segment || '',
-      ai_recommendation: row.ai_recommendation || '',
+      // AI Fields from v_tabel_detail
+      segment: row.segmen_nama || '',
+      ai_recommendation: row.treatment_aksi_utama || '',
       segment_wilayah: row.segment_wilayah || '',
-      segment_perilaku: row.segment_perilaku || '',
-      strategi_perilaku: row.strategi_perilaku || '',
+      segment_perilaku: row.segmen_kepatuhan || '',
+      strategi_perilaku: row.treatment_aksi_utama || '',
+
+      // New Treatment Fields
+      kode_upt: row.kode_upt,
+      segmen_kepatuhan: row.segmen_kepatuhan,
+      segmen_nama: row.segmen_nama,
+      treatment_aksi_utama: row.treatment_aksi_utama,
+      treatment_kanal_utama: row.treatment_kanal_utama,
+      treatment_kebijakan_amnesti: row.treatment_kebijakan_amnesti,
+      treatment_perkiraan_konversi: row.treatment_perkiraan_konversi,
+      usia_kendaraan: row.usia_kendaraan,
     };
   });
 }
 
 export async function getTotalTransactions(filters: DashboardFilters): Promise<number> {
   const { text: filterClause, values } = getFilterClause(filters);
-  const query = `SELECT COUNT(*) FROM ${MV_TABLE} ${filterClause}`;
+  const query = `
+    WITH filtered_mv AS (
+      SELECT DISTINCT ON (nopol) * 
+      FROM ${MV_TABLE}
+      ORDER BY nopol, COALESCE(paid_on::text, masa_pajak_sampai::text) DESC NULLS LAST
+    )
+    SELECT COUNT(*) 
+    FROM v_tabel_detail v
+    LEFT JOIN filtered_mv mv ON v.nopol = mv.nopol
+    ${filterClause}
+  `;
   const { rows } = await serialQuery(query, values);
   return parseInt(rows[0].count);
 }
